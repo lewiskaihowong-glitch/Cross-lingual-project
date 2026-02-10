@@ -2,6 +2,7 @@ import asyncio
 from core.translator import process_entry
 import pandas as pd
 import argparse
+import os
 
 async def worker_pool(tasks, max_workers=1):
     """Process tasks with controlled concurrency to avoid rate limits"""
@@ -24,6 +25,7 @@ async def run_pipeline(data_path, language, num_samples):
 
     results = await worker_pool(tasks, max_workers=1)
     final_dataset = pd.DataFrame([result for result in results if result])
+    os.makedirs("data/final", exist_ok=True)
     final_dataset.to_csv(f"data/final/final_dataset_{language}.csv", index=False)
 
 if __name__ == "__main__":
