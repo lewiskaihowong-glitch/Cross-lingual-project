@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
+      contents: write
       actions: write
     
     steps:
@@ -70,6 +70,19 @@ jobs:
         echo "Final directory contents:"
         ls -la data/final/ || echo "data/final/ directory doesn't exist"
     
+    - name: Commit and push results to repository
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add data/final/final_dataset_${{ github.event.inputs.language }}.csv
+        if [ -n "$(git status --porcelain)" ]; then
+          git commit -m "Add final_dataset_${{ github.event.inputs.language }}.csv"
+          git push
+          echo "Results committed and pushed to repository"
+        else
+          echo "No changes to commit"
+        fi
+    
     - name: Upload results
       uses: actions/upload-artifact@v4
       with:
@@ -78,5 +91,5 @@ jobs:
 
     - name: Display completion message
       run: |
-        echo "🎉 Pipeline completed successfully!"
-        echo "📁 Results uploaded as artifact: translation-results-${{ github.event.inputs.language }}-${{ github.run_number }}"
+        echo "Pipeline completed successfully!"
+        echo "Results uploaded as artifact: translation-results-${{ github.event.inputs.language }}-${{ github.run_number }}"
