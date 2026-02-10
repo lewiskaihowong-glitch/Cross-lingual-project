@@ -18,38 +18,29 @@ async def back_translation(question):
 
 async def process_retry_translation(original_query, language):
         """Translation"""
-        print(f"🔁 Retrying translation {original_query} into {language}")
         response = await retry_translation(original_query, language)
 
         """Back-translation"""
-        print(f"🔄 Back-translating {response} into English")
         back_translation_response = await back_translation(response)
         
         """Similarity calculation"""
-        print("📊 Calculating similarity for retry...")
         similarity = await calculate_similarity(original_query, back_translation_response)
         # Clamp similarity to handle floating-point precision errors
         similarity = min(max(similarity, 0.0), 1.0)
-        print(f"📈 Cosine similarity: {similarity:.4f}")
         return similarity >= 0.95
 
 async def process_entry(original_query, language):
         """Translation"""
-        print(f"🔤 Translating {original_query} into {language}")
         response = await translation(original_query, language)
 
         """Back-translation"""
-        print(f"🔄 Back-translating {response} into English")
         back_translation_response = await back_translation(response)
         
         """Similarity calculation"""
-        print("📊 Calculating similarity...")
         similarity = await calculate_similarity(original_query, back_translation_response)
         # Clamp similarity to handle floating-point precision errors
         similarity = min(max(similarity, 0.0), 1.0)
-        print(f"📈 Cosine similarity: {similarity:.4f}")
         if similarity >= 0.95:
-            print("✅ The translation is accurate -> Green status")
             return {
                 "original_query": original_query,
                 "status": "Green",
@@ -57,10 +48,8 @@ async def process_entry(original_query, language):
                 "similarity": similarity
             }
         elif similarity >= 0.88:
-            print("🟡 The translation is somewhat accurate -> Yellow status")
             return await process_retry_translation(original_query, language)
         else:
-            print("🔴 The translation is inaccurate -> Red status")
             return {
                 "original_query": original_query,
                 "status": "Red",
