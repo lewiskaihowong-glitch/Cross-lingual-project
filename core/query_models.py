@@ -27,6 +27,7 @@ async def query_groq(prompt, model_id = "groq/llama-3.3-70b-versatile"):
             messages = [{"role": "user", "content": prompt}],
             temperature = 0.0
         )
+        await asyncio.sleep(1)
         return response.choices[0].message.content
     except Exception as e:
         raise
