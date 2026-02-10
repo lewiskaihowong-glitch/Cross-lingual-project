@@ -27,7 +27,21 @@ async def process_retry_translation(original_query, language):
         similarity = await calculate_similarity(original_query, back_translation_response)
         # Clamp similarity to handle floating-point precision errors
         similarity = min(max(similarity, 0.0), 1.0)
-        return similarity >= 0.95
+        
+        if similarity >= 0.95:
+            return {
+                "original_query": original_query,
+                "status": "Green",
+                "translated_query": response,
+                "similarity": similarity
+            }
+        else:
+            return {
+                "original_query": original_query,
+                "status": "Red", 
+                "translated_query": response,
+                "similarity": similarity
+            }
 
 async def process_entry(original_query, language):
         """Translation"""
