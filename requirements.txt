@@ -1,0 +1,12 @@
+# Core dependencies
+litellm>=1.0.0
+python-dotenv>=1.0.0
+aiolimiter>=1.0.0
+tenacity>=8.0.0
+voyageai>=0.2.0
+
+# Data processing
+numpy>=1.21.0
+pandas>=2.0.0
+
+# Note: asyncio, argparse, json are built-in Python modules

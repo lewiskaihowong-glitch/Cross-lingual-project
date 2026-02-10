@@ -1,0 +1,57 @@
+name: Create Dataset
+
+on:
+  workflow_dispatch:
+    inputs:
+      language:
+        description: 'Language to process (e.g., English, Spanish)'
+        required: true
+        default: 'English'
+      num_samples:
+        description: 'Number of samples to process'
+        required: true
+        default: 8
+      dataset:
+        description: 'Dataset to use'
+        required: true
+        default: 'english.csv'
+
+jobs:
+  create-dataset:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Create output directory
+      run: mkdir -p data/final
+    
+    - name: Run pipeline
+      env:
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      
+      run: |
+        python main.py "${{ github.event.inputs.dataset }}" "${{ github.event.inputs.language }}" ${{ github.event.inputs.num_samples }}
+    
+    - name: Upload results
+      uses: actions/upload-artifact@v4
+      with:
+        name: translation-results-${{ github.event.inputs.language }}-${{ github.run_number }}
+        path: data/final/
+
+    - name: Display completion message
+      run: |
+        echo "🎉 Pipeline completed successfully!"
+        echo "📁 Results uploaded as artifact: translation-results-${{ github.event.inputs.language }}-${{ github.run_number }}"
