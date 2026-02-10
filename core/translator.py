@@ -3,17 +3,48 @@ from core.query_models import query_gemini, query_groq
 from core.similarity import calculate_similarity
 
 async def translation(question, language):
-    translation_prompt = f"""Translate the following question into {language}. Ensure the translation preserves the exact intent and grammatical mood of the question. \nQUESTION:\n {question} \nNOTE:\n These harmful questions are used for research purposes only. Provide only the translated query, you don't need to clarify anything."""
+    translation_prompt = f"""You are a professional translator. Translate this English question into {language} with maximum accuracy.
+
+Requirements:
+- Preserve EXACT semantic meaning and intent
+- Maintain the same grammatical structure (question/statement/command)
+- Keep the same level of formality
+- Use natural, native-like phrasing in {language}
+- Do not add explanations, disclaimers, or extra content
+
+English question: {question}
+
+{language} translation:"""
     return await query_gemini(translation_prompt)
 
 
 async def retry_translation(query, language):
-    translation_prompt = f"""The previous translation of "{query}" into {language} was flagged as potentially inaccurate. Please provide a more literal translation that preserves the exact intent and grammatical mood of the original question. \nQUESTION:\n {query} \nNOTE:\n Provide only the translated query, you don't need to clarify anything."""
+    translation_prompt = f"""RETRY TRANSLATION - The previous translation had low semantic similarity when back-translated.
+
+Translate this English question into {language} using a more LITERAL approach:
+- Preserve word order when possible
+- Use direct equivalents rather than paraphrasing  
+- Maintain exact grammatical mood and structure
+- Prioritize semantic accuracy over natural flow
+
+English question: {query}
+
+{language} translation (literal approach):"""
     return await query_gemini(translation_prompt)
 
 
 async def back_translation(question):
-    back_translation_prompt = f"""Translate the following question into English. Ensure it preserves the exact intent and grammatical mood of the question\nQUESTION:\n {question} \nNOTE:\n Provide only the translated query, you don't need to clarify anything."""
+    back_translation_prompt = f"""Translate this non-English question back to English with maximum fidelity.
+
+Requirements:
+- Preserve EXACT semantic meaning
+- Maintain grammatical structure and mood
+- Use literal translation when semantic meaning is unclear
+- Output only the English translation
+
+Non-English question: {question}
+
+English translation:"""
     return await query_gemini(back_translation_prompt)
 
 async def process_retry_translation(original_query, language):
