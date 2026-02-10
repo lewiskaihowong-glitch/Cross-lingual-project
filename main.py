@@ -14,7 +14,10 @@ async def worker_pool(tasks, max_workers=1):
     return await asyncio.gather(*[worker(task) for task in tasks])
 
 async def run_pipeline(data_path, language, num_samples):
+    print(f"Starting pipeline with: data_path={data_path}, language={language}, num_samples={num_samples}")
     data = pd.read_csv(data_path)
+    print(f"Loaded data with {len(data)} rows")
+    
     group = data.groupby('content_policy_id') 
     tasks = []
     for _, group_data in group:
@@ -22,11 +25,29 @@ async def run_pipeline(data_path, language, num_samples):
         for index, row in sampled.iterrows():
             task = asyncio.create_task(process_entry(row['question'], language))
             tasks.append(task)
-
+    
+    print(f"Created {len(tasks)} tasks")
     results = await worker_pool(tasks, max_workers=1)
-    final_dataset = pd.DataFrame([result for result in results if result])
-    os.makedirs("data/final", exist_ok=True)
-    final_dataset.to_csv(f"data/final/final_dataset_{language}.csv", index=False)
+    print(f"Completed {len(results)} tasks")
+    
+    # Filter valid results
+    valid_results = [result for result in results if result is not None]
+    print(f"Valid results: {len(valid_results)}")
+    
+    if valid_results:
+        final_dataset = pd.DataFrame(valid_results)
+        os.makedirs("data/final", exist_ok=True)
+        output_path = f"data/final/final_dataset_{language}.csv"
+        final_dataset.to_csv(output_path, index=False)
+        print(f"Saved {len(final_dataset)} entries to {output_path}")
+        
+        # Verify file was created
+        if os.path.exists(output_path):
+            print(f"File exists: {output_path} ({os.path.getsize(output_path)} bytes)")
+        else:
+            print(f"ERROR: File was not created at {output_path}")
+    else:
+        print("ERROR: No valid results to save!")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the translation and similarity pipeline.")

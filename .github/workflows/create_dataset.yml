@@ -41,6 +41,17 @@ jobs:
     - name: Create output directory
       run: mkdir -p data/final
     
+    - name: Debug - Check directory structure before
+      run: |
+        echo "Current working directory:"
+        pwd
+        echo "Directory contents:"
+        ls -la
+        echo "Data directory contents:"
+        ls -la data/ || echo "data/ directory doesn't exist"
+        echo "Final directory contents:"
+        ls -la data/final/ || echo "data/final/ directory doesn't exist"
+    
     - name: Run pipeline
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -48,6 +59,15 @@ jobs:
       
       run: |
         python main.py "${{ github.event.inputs.dataset }}" "${{ github.event.inputs.language }}" ${{ github.event.inputs.num_samples }}
+    
+    - name: Debug - Check directory structure after
+      run: |
+        echo "Directory contents after pipeline:"
+        ls -la
+        echo "Data directory contents:"
+        ls -la data/ || echo "data/ directory doesn't exist"
+        echo "Final directory contents:"
+        ls -la data/final/ || echo "data/final/ directory doesn't exist"
     
     - name: Upload results
       uses: actions/upload-artifact@v4
