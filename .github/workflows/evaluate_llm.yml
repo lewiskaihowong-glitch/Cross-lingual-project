@@ -67,7 +67,7 @@ jobs:
     
     - name: Run pipeline
       env:
-        AZURE_API_KEY: ${{ secrets.GPT5_MINI_KEY }}
+        AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }},
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       
       run: |
