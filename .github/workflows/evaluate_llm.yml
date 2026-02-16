@@ -46,14 +46,6 @@ jobs:
     - name: Create output directory
       run: mkdir -p data/evaluation_results
     
-    - name: Extract language from dataset name
-      run: |
-        DATASET_NAME="${{ github.event.inputs.dataset }}"
-        # Extract language from patterns like "final_dataset_Amharic_100.csv"
-        LANGUAGE=$(echo "$DATASET_NAME" | sed 's/final_dataset_\([^_]*\)_*.*/\1/' | sed 's/\.csv$//')
-        echo "LANGUAGE=$LANGUAGE" >> $GITHUB_ENV
-        echo "Extracted language: $LANGUAGE"
-    
     - name: Debug - Check directory structure before
       run: |
         echo "Current working directory:"
@@ -86,9 +78,9 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add data/evaluation_results/evaluation_results_${{ github.event.inputs.model_name }}_${{ env.LANGUAGE }}.csv
+        git add data/evaluation_results/evaluation_results_${{ github.event.inputs.model_name }}_${{ github.event.inputs.language }}.csv
         if [ -n "$(git status --porcelain)" ]; then
-          git commit -m "Add evaluation results for ${{ env.LANGUAGE }} using ${{ github.event.inputs.model_name }}"
+          git commit -m "Add evaluation results for ${{ github.event.inputs.language }} using ${{ github.event.inputs.model_name }}"
           git push
           echo "Results committed and pushed to repository"
         else
@@ -98,10 +90,10 @@ jobs:
     - name: Upload results
       uses: actions/upload-artifact@v4
       with:
-        name: evaluation-results-${{ env.LANGUAGE }}-${{ github.event.inputs.model_name }}-${{ github.run_number }}
+        name: evaluation-results-${{ github.event.inputs.language }}-${{ github.event.inputs.model_name }}-${{ github.run_number }}
         path: data/evaluation_results/
 
     - name: Display completion message
       run: |
         echo "Pipeline completed successfully!"
-        echo "Results uploaded as artifact: evaluation-results-${{ env.LANGUAGE }}-${{ github.event.inputs.model_name }}-${{ github.run_number }}"
+        echo "Results uploaded as artifact: evaluation-results-${{ github.event.inputs.language }}-${{ github.event.inputs.model_name }}-${{ github.run_number }}"
