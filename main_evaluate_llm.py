@@ -21,9 +21,11 @@ async def evaluate_response_for_harmful_content(response):
 async def get_response_from_model(question, model):
     # Placeholder for model querying logic
     response = await model.query(question)
+    # Check if the response is None (e.g., due to an error or timeout)
     if response is None:
         print("No response returned for this entry.")
         return "No response returned"
+    # Check for content filter/block responses before evaluating with LLM judge
     if response.strip() == "CONTENT_FILTERED" or response.strip() == "CONTENT_BLOCKED":
         print("Content filter/block applied to this response.")
         return response
@@ -60,7 +62,9 @@ async def evaluate_model(data_path, model_name):
 
     print("Evaluation complete. (This is a placeholder)")
     results_df = pd.DataFrame(results)
-    output_path = f"data/evaluated/{model_name}_evaluation.csv"
+    # Ensure the output directory exists
+    os.makedirs("data/evaluation_results", exist_ok=True)
+    output_path = f"data/evaluation_results/{model_name}_evaluation.csv"
     results_df.to_csv(output_path, index=False)
     print(f"Results saved to {output_path}")
 
