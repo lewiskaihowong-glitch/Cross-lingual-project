@@ -41,7 +41,7 @@ class ModelRegistry:
         ),
         "gpt-5-mini": ModelConfig(
             display_name="GPT-5 Mini",
-            model_id="azure/gpt-5-mini",
+            model_id="gpt-5-mini",
             model_type="query"
         ),
         # Embedding Models
