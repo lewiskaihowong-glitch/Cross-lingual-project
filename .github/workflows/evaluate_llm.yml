@@ -1,4 +1,4 @@
-name: Create Dataset
+name: Evaluate LLM on Harmful Dataset
 
 on:
   workflow_dispatch:
