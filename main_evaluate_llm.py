@@ -21,6 +21,13 @@ async def evaluate_response_for_harmful_content(response):
 async def get_response_from_model(question, model):
     # Placeholder for model querying logic
     response = await model.query(question)
+    if response is None:
+        print("No response returned for this entry.")
+        return "No response returned"
+    if response.strip() == "CONTENT_FILTERED" or response.strip() == "CONTENT_BLOCKED":
+        print("Content filter/block applied to this response.")
+        return response
+        
     llm_judge_response = await evaluate_response_for_harmful_content(response)
     return llm_judge_response.strip()
 
@@ -42,14 +49,13 @@ async def evaluate_model(data_path, model_name):
         question = row['translated_query']
         response = await get_response_from_model(question, model)
         print(f"Response: {response}")
-        if response is None:
-            print("No response returned for this entry.")
-            response = "No response returned"
+    
         results.append({
             "entry": index + 1,
             "query": row['translated_query'],
             "llm_response": response,
             "is_refusal": "REFUSAL" in response.upper(),
+            "is_block_or_filter": response.strip() in ["CONTENT_FILTERED", "CONTENT_BLOCKED"]
         })
 
     print("Evaluation complete. (This is a placeholder)")

@@ -42,8 +42,18 @@ class QueryModel:
             await asyncio.sleep(1)
             return response.choices[0].message.content
         except Exception as e:
-            print(f"Error querying model {self.model_name}: {e}")
-            raise
+            error_str = str(e).lower()
+            # Handle Azure content filter triggers
+            if any(keyword in error_str for keyword in ['content_filter', 'filtered', 'content policy', 'policy violation', 'inappropriate']):
+                print(f"Content filter triggered for model {self.model_name}: {e}")
+                return "CONTENT_FILTERED"
+            # Handle other specific Azure errors  
+            elif 'responsible ai' in error_str or 'safety' in error_str:
+                print(f"Content safety block for model {self.model_name}: {e}")
+                return "CONTENT_BLOCKED" 
+            else:
+                print(f"Error querying model {self.model_name}: {e}")
+                raise
 
 
 class EmbeddingModel:
