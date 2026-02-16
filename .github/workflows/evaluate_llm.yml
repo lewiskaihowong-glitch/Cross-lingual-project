@@ -61,6 +61,7 @@ jobs:
     - name: Run pipeline
       env:
         AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+        GPT5_MINI_KEY: ${{ secrets.GPT5_MINI_KEY }}
       
       run: |
         python main_evaluate_llm.py "${{ github.event.inputs.dataset }}" "${{ github.event.inputs.model_name }}"
