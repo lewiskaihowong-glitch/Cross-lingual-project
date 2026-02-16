@@ -67,6 +67,6 @@ if __name__ == "__main__":
     
     # Use the model name directly from command line
     model_name = args.model
-    data_path = f"data/raw/{args.data_path}"
+    data_path = f"data/final/{args.data_path}"
     
     asyncio.run(evaluate_model(data_path, model_name))
