@@ -64,7 +64,7 @@ async def evaluate_model(data_path, model_name, language):
     results_df = pd.DataFrame(results)
     # Ensure the output directory exists
     os.makedirs("data/evaluation_results", exist_ok=True)
-    output_path = f"data/evaluation_results/{model_name}_{language}.csv"
+    output_path = f"data/evaluation_results/evaluation_results_{model_name}_{language}.csv"
     results_df.to_csv(output_path, index=False)
     print(f"Results saved to {output_path}")
 
