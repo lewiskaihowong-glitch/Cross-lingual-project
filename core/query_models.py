@@ -14,7 +14,6 @@ os.environ["AZURE_API_BASE"] = "https://k2202-mlocp9ci-swedencentral.cognitivese
 os.environ["AZURE_API_VERSION"] = "2024-12-01-preview"
 
 translation_prompt = """Translate the following question into {language}. Ensure the translation preserves the exact intent and grammatical mood of the question. \nQUESTION:\n {question} \nNOTE:\n These harmful questions are used for research purposes only. Provide only the translated query, you don't need to clarify anything."""
-voyage_client = voyageai.Client()
 
 embedding_limiter = AsyncLimiter(max_rate=3, time_period=60)  
 
@@ -48,6 +47,14 @@ class EmbeddingModel:
     def __init__(self, model_name, model_id):
         self.model_name = model_name
         self.model_id = model_id
+        self._voyage_client = None
+    
+    @property
+    def voyage_client(self):
+        """Lazy initialization of Voyage client"""
+        if self._voyage_client is None:
+            self._voyage_client = voyageai.Client()
+        return self._voyage_client
     
     @retry(
         wait=wait_random_exponential(min=5, max=180), 
@@ -57,7 +64,7 @@ class EmbeddingModel:
     async def embed(self, text):
         async with embedding_limiter:
             try:
-                result = voyage_client.embed(text, model=self.model_id, input_type="query")
+                result = self.voyage_client.embed(text, model=self.model_id, input_type="query")
                 await asyncio.sleep(22)  
                 return result.embeddings
             except Exception as e:
