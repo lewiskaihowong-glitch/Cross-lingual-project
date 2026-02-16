@@ -34,7 +34,6 @@ class QueryModel:
             response = completion(
                 model = self.model_id,
                 messages = [{"role": "user", "content": prompt}],
-                temperature = self.temperature,
             )
             await asyncio.sleep(1)
             return response.choices[0].message.content
