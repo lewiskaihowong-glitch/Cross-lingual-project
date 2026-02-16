@@ -75,9 +75,10 @@ if __name__ == "__main__":
     parser.add_argument("model", type=str, help="Model to test")
     parser.add_argument("language", type=str, help="Language of the dataset (e.g., 'en', 'zh')")
     args = parser.parse_args()
+    language = args.language
     
     # Use the model name directly from command line
     model_name = args.model
     data_path = f"data/final/{args.data_path}"
     
-    asyncio.run(evaluate_model(data_path, model_name))
+    asyncio.run(evaluate_model(data_path, model_name, language))
