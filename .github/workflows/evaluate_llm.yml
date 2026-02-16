@@ -3,18 +3,16 @@ name: Create Dataset
 on:
   workflow_dispatch:
     inputs:
-      language:
-        description: 'Language to process (e.g., English, Spanish)'
-        required: true
-        default: 'English'
-      num_samples:
-        description: 'Number of samples to process'
-        required: true
-        default: 8
-      dataset:
-        description: 'Dataset to use'
-        required: true
-        default: 'english.csv'
+        dataset:
+            description: 'Dataset to use'
+            required: true
+            default: 'english.csv'
+
+        model_name:
+            description: 'Model to evaluate'
+            required: true
+            default: 'gpt-5-mini'
+
 
 jobs:
   create-dataset:
@@ -39,7 +37,15 @@ jobs:
         pip install -r requirements.txt
     
     - name: Create output directory
-      run: mkdir -p data/final
+      run: mkdir -p data/evaluation_results
+    
+    - name: Extract language from dataset name
+      run: |
+        DATASET_NAME="${{ github.event.inputs.dataset }}"
+        # Extract language from patterns like "final_dataset_Amharic_100.csv"
+        LANGUAGE=$(echo "$DATASET_NAME" | sed 's/final_dataset_\([^_]*\)_*.*/\1/' | sed 's/\.csv$//')
+        echo "LANGUAGE=$LANGUAGE" >> $GITHUB_ENV
+        echo "Extracted language: $LANGUAGE"
     
     - name: Debug - Check directory structure before
       run: |
@@ -50,16 +56,14 @@ jobs:
         echo "Data directory contents:"
         ls -la data/ || echo "data/ directory doesn't exist"
         echo "Final directory contents:"
-        ls -la data/final/ || echo "data/final/ directory doesn't exist"
+        ls -la data/evaluation_results/ || echo "data/evaluation_results/ directory doesn't exist"
     
     - name: Run pipeline
       env:
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
       
       run: |
-        python main_create_dataset.py "${{ github.event.inputs.dataset }}" "${{ github.event.inputs.language }}" ${{ github.event.inputs.num_samples }}
+        python main_evaluate_llm.py "${{ github.event.inputs.dataset }}" "${{ github.event.inputs.model_name }}"
     
     - name: Debug - Check directory structure after
       run: |
@@ -67,16 +71,16 @@ jobs:
         ls -la
         echo "Data directory contents:"
         ls -la data/ || echo "data/ directory doesn't exist"
-        echo "Final directory contents:"
-        ls -la data/final/ || echo "data/final/ directory doesn't exist"
+        echo "Evaluation results directory contents:"
+        ls -la data/evaluation_results/ || echo "data/evaluation_results/ directory doesn't exist"
     
     - name: Commit and push results to repository
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add data/final/final_dataset_${{ github.event.inputs.language }}.csv
+        git add data/evaluation_results/evaluation_results_${{ github.event.inputs.model_name }}_${{ env.LANGUAGE }}.csv
         if [ -n "$(git status --porcelain)" ]; then
-          git commit -m "Add final_dataset_${{ github.event.inputs.language }}.csv"
+          git commit -m "Add evaluation results for ${{ env.LANGUAGE }} using ${{ github.event.inputs.model_name }}"
           git push
           echo "Results committed and pushed to repository"
         else
@@ -86,10 +90,10 @@ jobs:
     - name: Upload results
       uses: actions/upload-artifact@v4
       with:
-        name: translation-results-${{ github.event.inputs.language }}-${{ github.run_number }}
-        path: data/final/
+        name: evaluation-results-${{ env.LANGUAGE }}-${{ github.event.inputs.model_name }}-${{ github.run_number }}
+        path: data/evaluation_results/
 
     - name: Display completion message
       run: |
         echo "Pipeline completed successfully!"
-        echo "Results uploaded as artifact: translation-results-${{ github.event.inputs.language }}-${{ github.run_number }}"
+        echo "Results uploaded as artifact: evaluation-results-${{ env.LANGUAGE }}-${{ github.event.inputs.model_name }}-${{ github.run_number }}"

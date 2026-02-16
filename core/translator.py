@@ -1,6 +1,7 @@
 import asyncio
-from core.query_models import query_gemini, query_groq
+from core.query_models import QueryModel, EmbeddingModel
 from core.similarity import calculate_similarity
+from core.model_registry import get_query_model 
 
 async def translation(question, language):
     translation_prompt = f"""You are a professional translator. Translate this English question into {language} with maximum accuracy.
@@ -15,7 +16,8 @@ Requirements:
 English question: {question}
 
 {language} translation:"""
-    return await query_gemini(translation_prompt)
+    model = get_query_model("gemini")
+    return await model.query(translation_prompt)
 
 
 async def retry_translation(query, language):
@@ -30,7 +32,8 @@ Translate this English question into {language} using a more LITERAL approach:
 English question: {query}
 
 {language} translation (literal approach):"""
-    return await query_gemini(translation_prompt)
+    model = get_query_model("gemini")
+    return await model.query(translation_prompt)
 
 
 async def back_translation(question):
@@ -45,7 +48,8 @@ Requirements:
 Non-English question: {question}
 
 English translation:"""
-    return await query_gemini(back_translation_prompt)
+    model = get_query_model("gemini")
+    return await model.query(back_translation_prompt)
 
 async def process_retry_translation(original_query, language):
         """Translation"""
