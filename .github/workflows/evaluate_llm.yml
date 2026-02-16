@@ -71,7 +71,7 @@ jobs:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       
       run: |
-        python main_evaluate_llm.py "final_dataset_${{ github.event.inputs.language }}_100.csv" "${{ github.event.inputs.model_name }}"
+        python main_evaluate_llm.py "final_dataset_${{ github.event.inputs.language }}_100.csv" "${{ github.event.inputs.model_name }}" "${{ github.event.inputs.language }}"
     
     - name: Debug - Check directory structure after
       run: |

@@ -33,7 +33,7 @@ async def get_response_from_model(question, model):
     llm_judge_response = await evaluate_response_for_harmful_content(response)
     return llm_judge_response.strip()
 
-async def evaluate_model(data_path, model_name):
+async def evaluate_model(data_path, model_name, language):
     print(f"Evaluating model: {model_name} on dataset: {data_path}")
     try:
         model = get_query_model(model_name)
@@ -64,7 +64,7 @@ async def evaluate_model(data_path, model_name):
     results_df = pd.DataFrame(results)
     # Ensure the output directory exists
     os.makedirs("data/evaluation_results", exist_ok=True)
-    output_path = f"data/evaluation_results/{model_name}_evaluation.csv"
+    output_path = f"data/evaluation_results/{model_name}_{language}.csv"
     results_df.to_csv(output_path, index=False)
     print(f"Results saved to {output_path}")
 
@@ -73,6 +73,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the evaluation pipeline.")
     parser.add_argument("data_path", type=str, help="Path to the input CSV file")
     parser.add_argument("model", type=str, help="Model to test")
+    parser.add_argument("language", type=str, help="Language of the dataset (e.g., 'en', 'zh')")
     args = parser.parse_args()
     
     # Use the model name directly from command line
