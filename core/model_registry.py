@@ -34,14 +34,14 @@ class ModelRegistry:
             model_id="groq/llama-3.3-70b-versatile",
             model_type="query"
         ),
-        "llama-guard-4": ModelConfig(
-            display_name="Llama Guard 4",
-            model_id="meta-llama/llama-guard-4-12b",
+        "2.0-flash-lite": ModelConfig(
+            display_name="Gemini 2.0 Flash Lite Safety",
+            model_id="gemini/gemini-2.0-flash-lite",
             model_type="query"
         ),
         "gpt-5-mini": ModelConfig(
             display_name="GPT-5 Mini",
-            model_id="gpt-5-mini",
+            model_id="azure/gpt-5-mini",
             model_type="query"
         ),
         # Embedding Models
