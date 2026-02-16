@@ -3,10 +3,17 @@ name: Evaluate LLM on Harmful Dataset
 on:
   workflow_dispatch:
     inputs:
-        dataset:
-            description: 'Dataset to use'
+        language:
+            description: 'Language to evaluate'
             required: true
-            default: 'english.csv'
+            type: choice
+            options:
+              - Amharic
+              - Korean
+              - Irish
+              - Hindi
+              - Spanish
+            default: Amharic
 
         model_name:
             description: 'Model to evaluate'
@@ -60,11 +67,10 @@ jobs:
     
     - name: Run pipeline
       env:
-        AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
-        GPT5_MINI_KEY: ${{ secrets.GPT5_MINI_KEY }}
+        AZURE_API_KEY: ${{ secrets.GPT5_MINI_KEY }}
       
       run: |
-        python main_evaluate_llm.py "${{ github.event.inputs.dataset }}" "${{ github.event.inputs.model_name }}"
+        python main_evaluate_llm.py "final_dataset_${{ github.event.inputs.language }}_100.csv" "${{ github.event.inputs.model_name }}"
     
     - name: Debug - Check directory structure after
       run: |
