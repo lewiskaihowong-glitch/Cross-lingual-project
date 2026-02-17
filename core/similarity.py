@@ -14,7 +14,7 @@ def cosine_similarity(a, b):
 Calculates the cosine similarity between the original query and the back-translated query to assess the accuracy of the translation. 
 """
 async def calculate_similarity(original_query, back_translated_query):
-    embedding_model = get_embedding_model("voyage")
+    embedding_model = get_embedding_model("voyage-v3")
     
     # Get embeddings with built-in rate limiting
     original_query_embedding = await embedding_model.embed(original_query.strip())

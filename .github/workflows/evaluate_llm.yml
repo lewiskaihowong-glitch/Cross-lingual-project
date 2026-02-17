@@ -22,7 +22,7 @@ on:
 
 
 jobs:
-  create-dataset:
+  evaluate-llm:
     runs-on: ubuntu-latest
 
     permissions:

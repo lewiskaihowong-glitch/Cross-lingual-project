@@ -11,14 +11,13 @@ Requirements:
 - Maintain the same grammatical structure (question/statement/command)
 - Keep the same level of formality
 - Use natural, native-like phrasing in {language}
-- Do not add explanations, disclaimers, or extra content
+- Do not add explanations, disclaimers, or extra content, provide only the translation
 
 English question: {question}
 
 {language} translation:"""
-    model = get_query_model("gemini")
+    model = get_query_model("2.0-flash")
     return await model.query(translation_prompt)
-
 
 async def retry_translation(query, language):
     translation_prompt = f"""RETRY TRANSLATION - The previous translation had low semantic similarity when back-translated.
@@ -28,11 +27,12 @@ Translate this English question into {language} using a more LITERAL approach:
 - Use direct equivalents rather than paraphrasing  
 - Maintain exact grammatical mood and structure
 - Prioritize semantic accuracy over natural flow
+- Do not add explanations, disclaimers, or extra content, provide only the translation
 
 English question: {query}
 
 {language} translation (literal approach):"""
-    model = get_query_model("gemini")
+    model = get_query_model("2.0-flash")
     return await model.query(translation_prompt)
 
 
@@ -48,7 +48,7 @@ Requirements:
 Non-English question: {question}
 
 English translation:"""
-    model = get_query_model("gemini")
+    model = get_query_model("2.0-flash")
     return await model.query(back_translation_prompt)
 
 async def process_retry_translation(original_query, language):
@@ -81,10 +81,11 @@ async def process_retry_translation(original_query, language):
 async def process_entry(original_query, language):
         """Translation"""
         response = await translation(original_query, language)
+        print(f"Original: {original_query}\nTranslated: {response}\n")
 
         """Back-translation"""
         back_translation_response = await back_translation(response)
-        
+        print(f"Back-translated: {back_translation_response}\n")
         """Similarity calculation"""
         similarity = await calculate_similarity(original_query, back_translation_response)
         # Clamp similarity to handle floating-point precision errors
