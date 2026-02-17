@@ -11,7 +11,9 @@ Requirements:
 - Maintain the same grammatical structure (question/statement/command)
 - Keep the same level of formality
 - Use natural, native-like phrasing in {language}
-- Do not add explanations, disclaimers, or extra content, provide only the translation
+
+***Response format:***
+- Output only the translation without any explanations or disclaimers
 
 English question: {question}
 
@@ -27,7 +29,9 @@ Translate this English question into {language} using a more LITERAL approach:
 - Use direct equivalents rather than paraphrasing  
 - Maintain exact grammatical mood and structure
 - Prioritize semantic accuracy over natural flow
-- Do not add explanations, disclaimers, or extra content, provide only the translation
+
+***Response format:***
+- Ouput only the translation without any explanations or disclaimers
 
 English question: {query}
 
@@ -43,6 +47,8 @@ Requirements:
 - Preserve EXACT semantic meaning
 - Maintain grammatical structure and mood
 - Use literal translation when semantic meaning is unclear
+
+***Response format:***
 - Output only the English translation
 
 Non-English question: {question}
