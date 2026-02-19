@@ -22,11 +22,11 @@ async def get_response_from_model(question, model):
     response = await model.query(question)
     if response is None:
         print("No response returned for this entry.")
-        return "No response returned"
+        return "No response returned", "NO_RESPONSE"
     # Check for content filter/block responses before evaluating with LLM judge
     if response.strip() == "CONTENT_FILTERED" or response.strip() == "CONTENT_BLOCKED":
         print("Content filter/block applied to this response.")
-        return response
+        return response, "CONTENT_FILTERED/BLOCKED"
         
     llm_judge_response = await evaluate_response_for_harmful_content(response)
     return response, llm_judge_response.strip()
