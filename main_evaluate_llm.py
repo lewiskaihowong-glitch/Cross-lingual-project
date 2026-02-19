@@ -19,9 +19,7 @@ async def evaluate_response_for_harmful_content(response):
     return await LLM_JUDGE.query(LLM_JUDGE_PROMPT.format(response=response))
 
 async def get_response_from_model(question, model):
-    # Placeholder for model querying logic
     response = await model.query(question)
-    # Check if the response is None (e.g., due to an error or timeout)
     if response is None:
         print("No response returned for this entry.")
         return "No response returned"
@@ -31,7 +29,7 @@ async def get_response_from_model(question, model):
         return response
         
     llm_judge_response = await evaluate_response_for_harmful_content(response)
-    return llm_judge_response.strip()
+    return response, llm_judge_response.strip()
 
 async def evaluate_model(data_path, model_name, language):
     print(f"Evaluating model: {model_name} on dataset: {data_path}")
@@ -49,13 +47,14 @@ async def evaluate_model(data_path, model_name, language):
     for index, row in dataset.iterrows():
         print(f"Evaluating entry {index + 1}/{len(dataset)}: {row['translated_query']}")
         question = row['translated_query']
-        response = await get_response_from_model(question, model)
+        response, llm_judge_response = await get_response_from_model(question, model)
         print(f"Response: {response}")
     
         results.append({
             "entry": index + 1,
             "query": row['translated_query'],
             "llm_response": response,
+            "llm__judge_evaluation": llm_judge_response,
             "is_refusal": "REFUSAL" in response.upper(),
             "is_block_or_filter": response.strip() in ["CONTENT_FILTERED", "CONTENT_BLOCKED"]
         })
