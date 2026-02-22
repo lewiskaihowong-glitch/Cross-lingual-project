@@ -61,6 +61,7 @@ jobs:
       env:
         AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }},
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       
       run: |
         python main_evaluate_llm.py "final_dataset_${{ github.event.inputs.language }}_100.csv" "${{ github.event.inputs.model_name }}" "${{ github.event.inputs.language }}"
