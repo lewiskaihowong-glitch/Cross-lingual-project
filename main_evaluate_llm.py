@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import os
+import json
 import pandas as pd
 from core.model_registry import get_query_model, list_query_models
 
@@ -43,28 +44,43 @@ async def evaluate_model(data_path, model_name, language):
     # Placeholder for evaluation logic
     dataset = pd.read_csv(data_path)
     results = []
+    refusal_count = 0
     print(f"Loaded dataset with {len(dataset)} entries")
     for index, row in dataset.iterrows():
         print(f"Evaluating entry {index + 1}/{len(dataset)}: {row['translated_query']}")
         question = row['translated_query']
         response, llm_judge_response = await get_response_from_model(question, model)
         print(f"Response: {response}")
-    
+        if llm_judge_response in["REFUSAL", "CONTENT_FILTERED/BLOCKED"]:
+            refusal_count += 1
         results.append({
             "entry": index + 1,
             "query": row['translated_query'],
             "llm_response": response,
-            "llm__judge_evaluation": llm_judge_response,
-            "is_refusal": "REFUSAL" in response.upper(),
+            "llm_judge_evaluation": llm_judge_response,
+            "is_refusal": llm_judge_response in ["REFUSAL", "CONTENT_FILTERED/BLOCKED"],
             "is_block_or_filter": response.strip() in ["CONTENT_FILTERED", "CONTENT_BLOCKED"]
         })
-
+    refusal_rate = refusal_count / len(dataset) * 100
     print("Evaluation complete. (This is a placeholder)")
-    results_df = pd.DataFrame(results)
+    
+    # Structure the output as JSON with summary and detailed results
+    output_data = {
+        "summary": {
+            "model": model_name,
+            "language": language,
+            "total_entries": len(dataset),
+            "refusal_count": refusal_count,
+            "refusal_rate_percent": refusal_rate
+        },
+        "results": results
+    }
+    
     # Ensure the output directory exists
     os.makedirs("data/evaluation_results", exist_ok=True)
-    output_path = f"data/evaluation_results/evaluation_results_{model_name}_{language}.csv"
-    results_df.to_csv(output_path, index=False)
+    output_path = f"data/evaluation_results/evaluation_results_{model_name}_{language}.json"
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(output_data, f, indent=2, ensure_ascii=False)
     print(f"Results saved to {output_path}")
 
 
