@@ -29,6 +29,11 @@ class ModelRegistry:
             model_id="gemini/gemini-2.0-flash",
             model_type="query"
         ),
+        "2.5-flash": ModelConfig(
+            display_name="Gemini 2.5 Flash",
+            model_id="gemini/gemini-2.5-flash",
+            model_type="query"
+        ),
         "llama-3.3-70b": ModelConfig(
             display_name="Groq Llama 3.3 70B Versatile", 
             model_id="groq/llama-3.3-70b-versatile",
