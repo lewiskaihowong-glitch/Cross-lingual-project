@@ -79,7 +79,7 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add data/evaluation_results/evaluation_results_${{ github.event.inputs.model_name }}_${{ github.event.inputs.language }}.csv
+        git add data/evaluation_results/evaluation_results_${{ github.event.inputs.model_name }}_${{ github.event.inputs.language }}.json
         if [ -n "$(git status --porcelain)" ]; then
           git commit -m "Add evaluation results for ${{ github.event.inputs.language }} using ${{ github.event.inputs.model_name }}"
           git push
