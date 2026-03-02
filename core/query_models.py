@@ -39,12 +39,16 @@ class QueryModel:
                 model = self.model_id,
                 messages = [{"role": "user", "content": prompt}],
             )
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)  
             return response.choices[0].message.content
         except Exception as e:
             error_str = str(e).lower()
-            # Handle Azure content filter triggers
-            if any(keyword in error_str for keyword in ['content_filter', 'filtered', 'content policy', 'policy violation', 'inappropriate']):
+            # Handle rate limit errors
+            if any(keyword in error_str for keyword in ['rate limit', 'too many requests', '429', 'quota']):
+                print(f"Rate limit hit for model {self.model_name}: {e}")
+                await asyncio.sleep(5)  
+                raise  
+            elif any(keyword in error_str for keyword in ['content_filter', 'filtered', 'content policy', 'policy violation', 'inappropriate']):
                 print(f"Content filter triggered for model {self.model_name}: {e}")
                 return "CONTENT_FILTERED"
             # Handle other specific Azure errors  
