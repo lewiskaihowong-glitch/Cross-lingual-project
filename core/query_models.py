@@ -21,6 +21,15 @@ translation_prompt = """Translate the following question into {language}. Ensure
 
 embedding_limiter = AsyncLimiter(max_rate=3, time_period=60)  
 
+# Model-specific rate limiting configuration (in seconds)
+MODEL_RATE_LIMITS = {
+    "azure/kimi-k2.5": 10,  # 10 seconds between requests for kimi
+    "azure/deepseek-v3.2": 5,  # 5 seconds for deepseek
+    "azure/mistral-large-3": 5,  # 5 seconds for mistral
+    "azure/gpt-5-mini": 3,  # 3 seconds for gpt-5-mini
+    "default": 2  # 2 seconds for all other models
+}
+
 def prompt_builder(question, language):
     prompt = translation_prompt.format(question=question, language=language)
     return prompt
@@ -32,21 +41,24 @@ class QueryModel:
         self.temperature = 0.0
         self.seed = 42
     
-    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+    @retry(wait=wait_random_exponential(min=5, max=120), stop=stop_after_attempt(8))
     async def query(self, prompt):
         try:
             response = completion(
                 model = self.model_id,
                 messages = [{"role": "user", "content": prompt}],
             )
-            await asyncio.sleep(2)  
+            sleep_duration = MODEL_RATE_LIMITS.get(self.model_id, MODEL_RATE_LIMITS["default"])
+            await asyncio.sleep(sleep_duration)  
             return response.choices[0].message.content
         except Exception as e:
             error_str = str(e).lower()
             # Handle rate limit errors
             if any(keyword in error_str for keyword in ['rate limit', 'too many requests', '429', 'quota']):
                 print(f"Rate limit hit for model {self.model_name}: {e}")
-                await asyncio.sleep(5)  
+                # Use longer sleep for rate limit errors, especially for kimi
+                rate_limit_sleep = MODEL_RATE_LIMITS.get(self.model_id, MODEL_RATE_LIMITS["default"]) * 3
+                await asyncio.sleep(rate_limit_sleep)  
                 raise  
             elif any(keyword in error_str for keyword in ['content_filter', 'filtered', 'content policy', 'policy violation', 'inappropriate']):
                 print(f"Content filter triggered for model {self.model_name}: {e}")
