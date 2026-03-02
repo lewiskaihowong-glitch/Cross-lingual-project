@@ -49,6 +49,21 @@ class ModelRegistry:
             model_id="azure/gpt-5-mini",
             model_type="query"
         ),
+        "llama-4-scout-17b": ModelConfig(
+            display_name="Llama 4 Scout 17B",
+            model_id="azure/llama-4-scout-17b",
+            model_type="query"
+        ),
+        "deepseek-v3.2": ModelConfig(
+            display_name="DeepSeek V3.2",
+            model_id="azure/deepseek-v3.2",
+            model_type="query"
+        ),
+        "mistral-large-3": ModelConfig(
+            display_name="Mistral Large 3",
+            model_id="azure/mistral-large-3",
+            model_type="query"
+        ),
         # Embedding Models
         "voyage-v3": ModelConfig(
             display_name="Voyage AI v3",
