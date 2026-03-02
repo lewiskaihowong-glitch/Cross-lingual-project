@@ -49,9 +49,9 @@ class ModelRegistry:
             model_id="azure/gpt-5-mini",
             model_type="query"
         ),
-        "llama-4-scout-17b": ModelConfig(
-            display_name="Llama 4 Scout 17B",
-            model_id="azure/llama-4-scout-17b",
+        "kimi-k2.5": ModelConfig(
+            display_name="Kimi K2.5",
+            model_id="azure/kimi-k2.5",
             model_type="query"
         ),
         "deepseek-v3.2": ModelConfig(
