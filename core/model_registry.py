@@ -61,7 +61,7 @@ class ModelRegistry:
         ),
         "mistral-large-3": ModelConfig(
             display_name="Mistral Large 3",
-            model_id="azure/mistral-large-3",
+            model_id="azure/Mistral-Large-3",
             model_type="query"
         ),
         # Embedding Models
