@@ -13,11 +13,18 @@ async def worker_pool(tasks, max_workers=1):
     
     return await asyncio.gather(*[worker(task) for task in tasks])
 
-async def run_pipeline(data_path, language, num_samples):
-    print(f"Starting pipeline with: data_path={data_path}, language={language}, num_samples={num_samples}")
-    data = pd.read_csv(data_path)
-    print(f"Loaded data with {len(data)} rows")
-    
+def generateSamplesForEnglish(data, num_samples):
+    group = data.groupby('content_policy_id')
+    results = []
+    for _, group_data in group:
+        sampled = group_data.sample(n=num_samples, replace=True)
+        for index, row in sampled.iterrows():
+            results.append({
+                "question": row['question'],
+            })
+    return results
+
+def createTasksForTranslation(data, language, num_samples):
     group = data.groupby('content_policy_id') 
     tasks = []
     for _, group_data in group:
@@ -25,10 +32,21 @@ async def run_pipeline(data_path, language, num_samples):
         for index, row in sampled.iterrows():
             task = asyncio.create_task(process_entry(row['question'], language))
             tasks.append(task)
+    return tasks
+
+async def run_pipeline(data_path, language, num_samples):
+    print(f"Starting pipeline with: data_path={data_path}, language={language}, num_samples={num_samples}")
+    data = pd.read_csv(data_path)
+    print(f"Loaded data with {len(data)} rows")
     
-    print(f"Created {len(tasks)} tasks")
-    results = await worker_pool(tasks, max_workers=1)
-    print(f"Completed {len(results)} tasks")
+    if language == "English":
+        results = generateSamplesForEnglish(data, num_samples)
+        print(f"Generated {len(results)} samples for English")
+    else:
+        tasks = createTasksForTranslation(data, language, num_samples)
+        print(f"Created {len(tasks)} tasks")
+        results = await worker_pool(tasks, max_workers=1)
+        print(f"Completed {len(results)} tasks")
     
     # Filter valid results
     valid_results = [result for result in results if result is not None]
