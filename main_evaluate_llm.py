@@ -59,7 +59,7 @@ async def evaluate_model(data_path, model_name, language):
             refusal_count += 1
         results.append({
             "entry": index + 1,
-            "query": row['translated_query'],
+            "query": question,
             "llm_response": response,
             "llm_judge_evaluation": llm_judge_response,
             "is_refusal": llm_judge_response in ["REFUSAL", "CONTENT_FILTERED/BLOCKED"],
