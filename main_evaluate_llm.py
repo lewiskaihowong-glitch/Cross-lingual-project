@@ -47,10 +47,11 @@ async def evaluate_model(data_path, model_name, language):
     refusal_count = 0
     print(f"Loaded dataset with {len(dataset)} entries")
     for index, row in dataset.iterrows():
-        print(f"Evaluating entry {index + 1}/{len(dataset)}: {row['translated_query']}")
         if language == "English":
+            print(f"Evaluating entry {index + 1}/{len(dataset)}: {row['question']}")
             question = row['question']
         else:
+            print(f"Evaluating entry {index + 1}/{len(dataset)}: {row['translated_query']}")
             question = row['translated_query']
         response, llm_judge_response = await get_response_from_model(question, model)
         print(f"Response: {response}")
