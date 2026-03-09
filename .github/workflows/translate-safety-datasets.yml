@@ -1,0 +1,78 @@
+name: Translate Safety Layer Datasets
+
+on:
+  workflow_dispatch:
+    inputs:
+      language:
+        description: 'Language to evaluate'
+        required: true
+        type: choice
+        options:
+            - English
+            - Amharic
+            - Korean
+            - Irish
+            - Hindi
+            - Spanish
+        default: Amharic
+
+      max_workers:
+        description: 'Number of concurrent workers'
+        required: false
+        default: '1'
+        type: string
+
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run translation script
+        env:
+            GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+            GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+            VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: |
+          if [ -n "${{ inputs.language }}" ]; then
+            echo "Translating specific language: ${{ inputs.language }}"
+            python translate_safety_datasets.py --language "${{ inputs.language }}" --max-workers ${{ inputs.max_workers }}
+          else
+            echo "Translating all languages"
+            python translate_safety_datasets.py --max-workers ${{ inputs.max_workers }}
+          fi
+      
+      - name: Check for changes
+        id: git-check
+        run: |
+          git diff --exit-code data/final/safety_layer_dataset_*.csv || echo "changes=true" >> $GITHUB_OUTPUT
+      
+      - name: Commit and push changes
+        if: steps.git-check.outputs.changes == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git pull
+          git add data/final/safety_layer_dataset_*.csv
+          git commit -m "chore: auto-translate safety layer datasets [skip ci]"
+          git push
+      
+      - name: No changes detected
+        if: steps.git-check.outputs.changes != 'true'
+        run: echo "No translations were needed - all datasets are up to date"
