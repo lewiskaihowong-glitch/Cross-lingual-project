@@ -12,6 +12,7 @@ class ModelConfig:
     model_type: str = "query"  
     temperature: float = 0.0
     seed: int = 42
+    return_reasoning: bool = False
 
 
 class ModelType(Enum):
@@ -53,6 +54,12 @@ class ModelRegistry:
             display_name="Kimi K2.5",
             model_id="azure/kimi-k2.5",
             model_type="query"
+        ),
+        "kimi-k2.5-reasoning": ModelConfig(
+            display_name="Kimi K2.5 with Reasoning",
+            model_id="azure/kimi-k2.5",
+            model_type="query",
+            return_reasoning=True
         ),
         "deepseek-v3.2": ModelConfig(
             display_name="DeepSeek V3.2",
@@ -102,7 +109,7 @@ class ModelRegistry:
         
         # Create appropriate model instance based on type
         if config.model_type == ModelType.QUERY.value:
-            model = QueryModel(config.display_name, config.model_id)
+            model = QueryModel(config.display_name, config.model_id, config.return_reasoning)
             model.temperature = config.temperature
             model.seed = config.seed
         elif config.model_type == ModelType.EMBEDDING.value:

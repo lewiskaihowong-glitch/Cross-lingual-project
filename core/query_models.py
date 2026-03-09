@@ -35,21 +35,42 @@ def prompt_builder(question, language):
     return prompt
 
 class QueryModel:
-    def __init__(self, model_name, model_id):
+    def __init__(self, model_name, model_id, return_reasoning=False):
         self.model_name = model_name
         self.model_id = model_id
         self.temperature = 0.0
         self.seed = 42
+        self.return_reasoning = return_reasoning
     
     @retry(wait=wait_random_exponential(min=5, max=120), stop=stop_after_attempt(8))
     async def query(self, prompt):
         try:
-            response = completion(
-                model = self.model_id,
-                messages = [{"role": "user", "content": prompt}],
-            )
+            # Add reasoning_effort parameter for Kimi and other reasoning models
+            completion_params = {
+                "model": self.model_id,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            
+            # Enable reasoning for Kimi model
+            if "kimi" in self.model_id.lower():
+                completion_params["reasoning_effort"] = "high" 
+            
+            response = completion(**completion_params)
             sleep_duration = MODEL_RATE_LIMITS.get(self.model_id, MODEL_RATE_LIMITS["default"])
-            await asyncio.sleep(sleep_duration)  
+            await asyncio.sleep(sleep_duration)
+            
+            # Extract reasoning if available and requested
+            if self.return_reasoning:
+                reasoning = None
+                # Check if reasoning is in the response
+                if hasattr(response.choices[0].message, 'reasoning_content'):
+                    reasoning = response.choices[0].message.reasoning_content
+                elif hasattr(response.choices[0], 'reasoning'):
+                    reasoning = response.choices[0].reasoning
+                
+                content = response.choices[0].message.content
+                return {"content": content, "reasoning": reasoning}
+            
             return response.choices[0].message.content
         except Exception as e:
             error_str = str(e).lower()

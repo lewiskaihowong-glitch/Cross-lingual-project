@@ -143,5 +143,6 @@ if __name__ == "__main__":
     # with open('data/failures_per_model_language.json', 'w', encoding='utf-8') as f:
     #     json.dump(failures_per_model_language, f, ensure_ascii=False, indent=4)
     # create_safety_layer_dataset()
-    # create_safety_layer_dataset_other_languages()
+    create_safety_layer_dataset_other_languages()
+    
     
