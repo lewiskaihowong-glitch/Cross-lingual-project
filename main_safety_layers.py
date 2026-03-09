@@ -3,6 +3,8 @@ import argparse
 import asyncio
 import pandas as pd
 
+from core.model_registry import get_query_model, list_query_models
+
 async def get_response_from_model(question, model):
     response = await model.query(question)
     reasoning = response.get("reasoning", "No reasoning provided")
@@ -12,6 +14,12 @@ async def get_response_from_model(question, model):
 """We run the response generation but get the reasoning as well"""
 async def reasoning_traceback(data_path, model_name):
     data = pd.read_csv(data_path)
+    try:
+        model = get_query_model(model_name)
+    except KeyError:
+        available_models = ", ".join(list_query_models())
+        print(f"ERROR: Model '{model_name}' not found. Available models: {available_models}")
+        return
     results = []
     for index, row in data.iterrows():
         question = row['question']
