@@ -11,7 +11,7 @@ async def get_response_from_model(question, model):
 """Specific for kimi k2.5"""
 """We run the response generation but get the reasoning as well"""
 async def reasoning_traceback(data_path, model_name):
-    data = pd.read_csv(data)
+    data = pd.read_csv(data_path)
     results = []
     for index, row in data.iterrows():
         question = row['question']
