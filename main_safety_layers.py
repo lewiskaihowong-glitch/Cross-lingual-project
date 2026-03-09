@@ -23,7 +23,7 @@ async def reasoning_traceback(data_path, model_name):
     results = []
     for index, row in data.iterrows():
         question = row['question']
-        response, reasoning = await get_response_from_model(question, model_name)
+        response, reasoning = await get_response_from_model(question, model)
         results.append({
             "entry": index + 1,
             "query": question,
