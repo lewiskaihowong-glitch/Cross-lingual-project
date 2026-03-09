@@ -41,34 +41,53 @@ class QueryModel:
         self.temperature = 0.0
         self.seed = 42
         self.return_reasoning = return_reasoning
+        self.debug = False  # Enable to print response structure
     
     @retry(wait=wait_random_exponential(min=5, max=120), stop=stop_after_attempt(8))
     async def query(self, prompt):
         try:
-            # Add reasoning_effort parameter for Kimi and other reasoning models
             completion_params = {
                 "model": self.model_id,
                 "messages": [{"role": "user", "content": prompt}],
             }
             
-            # Enable reasoning for Kimi model
-            if "kimi" in self.model_id.lower():
-                completion_params["reasoning_effort"] = "high" 
+            # Note: Azure Kimi may automatically include reasoning in responses
+            # without needing a special parameter. We'll check the response structure.
+            # If needed, uncomment below to try extra_body parameter:
+            # if "kimi" in self.model_id.lower() and self.return_reasoning:
+            #     completion_params["extra_body"] = {"reasoning_effort": "high"}
             
             response = completion(**completion_params)
             sleep_duration = MODEL_RATE_LIMITS.get(self.model_id, MODEL_RATE_LIMITS["default"])
             await asyncio.sleep(sleep_duration)
             
+            # Debug: print response structure
+            if self.debug:
+                print(f"\n=== DEBUG: Response type: {type(response)} ===")
+                print(f"Response attributes: {dir(response)}")
+                if hasattr(response, '__dict__'):
+                    print(f"Response dict: {response.__dict__}")
+                print(f"Choice[0] attributes: {dir(response.choices[0])}")
+                print(f"Message attributes: {dir(response.choices[0].message)}")
+                if hasattr(response.choices[0].message, '__dict__'):
+                    print(f"Message dict: {response.choices[0].message.__dict__}")
+            
             # Extract reasoning if available and requested
             if self.return_reasoning:
                 reasoning = None
-                # Check if reasoning is in the response
+                content = response.choices[0].message.content
+                
+                # Check various possible locations for reasoning in the response
                 if hasattr(response.choices[0].message, 'reasoning_content'):
                     reasoning = response.choices[0].message.reasoning_content
                 elif hasattr(response.choices[0], 'reasoning'):
                     reasoning = response.choices[0].reasoning
+                elif hasattr(response, 'reasoning'):
+                    reasoning = response.reasoning
+                # Check in the raw response object
+                elif hasattr(response, '_hidden_params') and 'reasoning' in response._hidden_params:
+                    reasoning = response._hidden_params['reasoning']
                 
-                content = response.choices[0].message.content
                 return {"content": content, "reasoning": reasoning}
             
             return response.choices[0].message.content
