@@ -24,6 +24,13 @@ def generateSamplesForEnglish(data, num_samples):
             })
     return results
 
+def createTasksForTranslationNoGrouping(data, language):
+    tasks = []
+    for index, row in data.iterrows():
+        task = asyncio.create_task(process_entry(row['question'], language))
+        tasks.append(task)
+    return tasks
+
 def createTasksForTranslation(data, language, num_samples):
     group = data.groupby('content_policy_id') 
     tasks = []
@@ -43,7 +50,7 @@ async def run_pipeline(data_path, language, num_samples):
         results = generateSamplesForEnglish(data, num_samples)
         print(f"Generated {len(results)} samples for English")
     else:
-        tasks = createTasksForTranslation(data, language, num_samples)
+        tasks = createTasksForTranslationNoGrouping(data, language)
         print(f"Created {len(tasks)} tasks")
         results = await worker_pool(tasks, max_workers=1)
         print(f"Completed {len(results)} tasks")
