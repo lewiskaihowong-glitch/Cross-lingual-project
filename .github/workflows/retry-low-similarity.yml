@@ -21,16 +21,6 @@ on:
         required: false
         default: '0.95'
         type: string
-      max_workers:
-        description: Number of concurrent workers
-        required: false
-        default: '1'
-        type: string
-      include_samples:
-        description: Include final_dataset_<language>_100.csv files
-        required: false
-        default: false
-        type: boolean
       dry_run:
         description: Preview only, do not modify files
         required: false
@@ -68,11 +58,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
         run: |
-          CMD="python main_retry_low_similarity.py --threshold ${{ inputs.threshold }} --max-workers ${{ inputs.max_workers }} --no-backup"
-
-          if [ "${{ inputs.include_samples }}" = "true" ]; then
-            CMD="$CMD --include-samples"
-          fi
+          CMD="python main_retry_low_similarity.py --threshold ${{ inputs.threshold }} --no-backup"
 
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             CMD="$CMD --dry-run"
