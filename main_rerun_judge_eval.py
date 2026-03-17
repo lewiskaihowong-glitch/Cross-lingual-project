@@ -62,6 +62,13 @@ async def rerun_judge(input_path, output_path=None, only_refusals=True, two_pass
 		"judge_mode": "two-pass" if two_pass_judge else "one-pass",
 	}
 
+	# Keep the top-level summary aligned with rerun labels for downstream tools.
+	summary = data.get("summary", {})
+	summary["total_entries"] = total_entries
+	summary["refusal_count"] = new_refusal_count
+	summary["refusal_rate_percent"] = new_refusal_rate
+	data["summary"] = summary
+
 	if output_path is None:
 		output_file = input_file.with_name(f"{input_file.stem}_rerun.json")
 	else:
