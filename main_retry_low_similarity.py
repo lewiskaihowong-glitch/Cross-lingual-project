@@ -8,7 +8,6 @@ from typing import List, Optional, Tuple
 import pandas as pd
 
 from core.translator import process_entry
-from main_create_dataset import worker_pool
 
 
 LANGUAGE_FILE_PATTERN = re.compile(r"^final_dataset_(.+?)(?:_(\d+))?\.csv$")
@@ -63,7 +62,6 @@ def get_low_similarity_indices(df: pd.DataFrame, threshold: float) -> List[int]:
 async def retry_low_similarity_for_file(
     file_path: str,
     threshold: float,
-    max_workers: int,
     dry_run: bool,
     create_backup: bool,
 ) -> int:
@@ -97,17 +95,28 @@ async def retry_low_similarity_for_file(
         )
         return len(low_indices)
 
-    tasks = [process_entry(df.at[idx, "original_query"], language) for idx in low_indices]
-    results = await worker_pool(tasks, max_workers=max_workers)
-
     updated_count = 0
-    for idx, result in zip(low_indices, results):
+    for idx in low_indices:
+        original_similarity = pd.to_numeric(df.at[idx, "similarity"], errors="coerce")
+        result = await process_entry(df.at[idx, "original_query"], language)
         if not result:
             continue
-        df.at[idx, "translated_query"] = result.get("translated_query", df.at[idx, "translated_query"])
-        df.at[idx, "similarity"] = result.get("similarity", df.at[idx, "similarity"])
-        df.at[idx, "status"] = result.get("status", df.at[idx, "status"])
-        updated_count += 1
+
+        new_similarity = result.get("similarity")
+        if pd.isna(original_similarity) or (
+            new_similarity is not None and new_similarity > float(original_similarity)
+        ):
+            df.at[idx, "translated_query"] = result.get("translated_query", df.at[idx, "translated_query"])
+            df.at[idx, "similarity"] = result.get("similarity", df.at[idx, "similarity"])
+            df.at[idx, "status"] = result.get("status", df.at[idx, "status"])
+            updated_count += 1
+            print(
+                f"[IMPROVED] row={idx} similarity={original_similarity} -> {new_similarity}"
+            )
+        else:
+            print(
+                f"[KEPT] row={idx} similarity={original_similarity} >= {new_similarity}"
+            )
 
     if create_backup:
         if os.path.exists(output_path):
@@ -123,7 +132,6 @@ async def retry_low_similarity_for_file(
 async def run(
     data_dir: str,
     threshold: float,
-    max_workers: int,
     dry_run: bool,
     create_backup: bool,
     language: str | None,
@@ -140,7 +148,6 @@ async def run(
             file_updates = await retry_low_similarity_for_file(
                 file_path=file_path,
                 threshold=threshold,
-                max_workers=max_workers,
                 dry_run=dry_run,
                 create_backup=create_backup,
             )
@@ -175,12 +182,6 @@ if __name__ == "__main__":
         help="Retry rows with similarity below this threshold (default: 0.95)",
     )
     parser.add_argument(
-        "--max-workers",
-        type=int,
-        default=1,
-        help="Number of concurrent workers (default: 1 to avoid rate limits)",
-    )
-    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview updates without writing files",
@@ -203,7 +204,6 @@ if __name__ == "__main__":
         run(
             data_dir=args.data_dir,
             threshold=args.threshold,
-            max_workers=args.max_workers,
             dry_run=args.dry_run,
             create_backup=not args.no_backup,
             language=args.language,
