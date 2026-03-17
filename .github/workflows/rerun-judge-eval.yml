@@ -1,0 +1,111 @@
+name: Re-run Judge Evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      language:
+        description: Language of the evaluation results to re-judge
+        required: true
+        type: choice
+        default: English
+        options:
+          - English
+          - Amharic
+          - Korean
+          - Irish
+          - Hindi
+          - Spanish
+      model_name:
+        description: Model whose results to re-judge
+        required: true
+        type: choice
+        default: gpt-5-mini
+        options:
+          - gpt-5-mini
+          - deepseek-v3.2
+          - 2.5-flash
+          - kimi-k2.5
+          - mistral-large-3
+      all_rows:
+        description: Re-evaluate all rows (not just REFUSAL-labelled ones)
+        required: false
+        default: false
+        type: boolean
+      two_pass_judge:
+        description: Enable two-pass judging (extra leakage audit for initial REFUSALs)
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  rerun-judge:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run re-judge script
+        env:
+          AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: |
+          INPUT="data/evaluation_results/evaluation_results_${{ inputs.model_name }}_${{ inputs.language }}.json"
+
+          CMD="python main_rerun_judge_eval.py $INPUT"
+
+          if [ "${{ inputs.all_rows }}" = "true" ]; then
+            CMD="$CMD --all_rows"
+          fi
+
+          if [ "${{ inputs.two_pass_judge }}" = "true" ]; then
+            CMD="$CMD --two_pass_judge"
+          fi
+
+          echo "Running: $CMD"
+          eval "$CMD"
+
+      - name: Check for changes
+        id: git-check
+        run: |
+          if [ -n "$(git status --porcelain -- data/evaluation_results/)" ]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push results
+        if: steps.git-check.outputs.changes == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git pull
+          git add data/evaluation_results/
+          git commit -m "chore: rerun judge eval for ${{ inputs.model_name }} ${{ inputs.language }} [skip ci]"
+          git push
+
+      - name: No changes detected
+        if: steps.git-check.outputs.changes != 'true'
+        run: echo "No changes produced by the re-judge run"
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: rerun-judge-${{ inputs.model_name }}-${{ inputs.language }}-${{ github.run_number }}
+          path: data/evaluation_results/
