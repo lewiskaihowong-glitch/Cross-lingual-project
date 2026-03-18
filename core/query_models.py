@@ -23,12 +23,30 @@ embedding_limiter = AsyncLimiter(max_rate=3, time_period=60)
 
 # Model-specific rate limiting configuration (in seconds)
 MODEL_RATE_LIMITS = {
-    "azure/kimi-k2.5": 10,  # 10 seconds between requests for kimi
+    "azure/kimi-k2.5": 20,  # More conservative interval for kimi to reduce 429s
     "azure/deepseek-v3.2": 5,  # 5 seconds for deepseek
     "azure/mistral-large-3": 5,  # 5 seconds for mistral
     "azure/gpt-5-mini": 3,  # 3 seconds for gpt-5-mini
     "default": 2  # 2 seconds for all other models
 }
+
+# Shared per-model limiter map so concurrent tasks honor the same throttle.
+MODEL_LIMITERS = {
+    model_id: AsyncLimiter(max_rate=1, time_period=period)
+    for model_id, period in MODEL_RATE_LIMITS.items()
+    if model_id != "default"
+}
+
+
+def _get_model_limiter(model_id):
+    limiter = MODEL_LIMITERS.get(model_id)
+    if limiter is not None:
+        return limiter
+
+    # Lazily create a limiter for models not explicitly listed above.
+    limiter = AsyncLimiter(max_rate=1, time_period=MODEL_RATE_LIMITS["default"])
+    MODEL_LIMITERS[model_id] = limiter
+    return limiter
 
 def prompt_builder(question, language):
     prompt = translation_prompt.format(question=question, language=language)
@@ -56,10 +74,10 @@ class QueryModel:
             # If needed, uncomment below to try extra_body parameter:
             # if "kimi" in self.model_id.lower() and self.return_reasoning:
             #     completion_params["extra_body"] = {"reasoning_effort": "high"}
-            
-            response = completion(**completion_params)
-            sleep_duration = MODEL_RATE_LIMITS.get(self.model_id, MODEL_RATE_LIMITS["default"])
-            await asyncio.sleep(sleep_duration)
+
+            # Apply a shared per-model throttle before issuing the request.
+            async with _get_model_limiter(self.model_id):
+                response = completion(**completion_params)
             
             # Debug: print response structure
             if self.debug:
@@ -97,7 +115,7 @@ class QueryModel:
             if any(keyword in error_str for keyword in ['rate limit', 'too many requests', '429', 'quota']):
                 print(f"Rate limit hit for model {self.model_name}: {e}")
                 # Use longer sleep for rate limit errors, especially for kimi
-                rate_limit_sleep = MODEL_RATE_LIMITS.get(self.model_id, MODEL_RATE_LIMITS["default"]) * 3
+                rate_limit_sleep = MODEL_RATE_LIMITS.get(self.model_id, MODEL_RATE_LIMITS["default"]) * 4
                 await asyncio.sleep(rate_limit_sleep)  
                 raise  
             elif any(keyword in error_str for keyword in ['content_filter', 'filtered', 'content policy', 'policy violation', 'inappropriate']):
