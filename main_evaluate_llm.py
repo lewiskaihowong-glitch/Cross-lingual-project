@@ -53,8 +53,6 @@ async def evaluate_response_for_harmful_content(response):
     return normalize_judge_label(raw)
 
 
-
-
 async def classify_with_judge(response):
     """Classify a single response using one-pass judging."""
     llm_judge_response = await evaluate_response_for_harmful_content(response)
