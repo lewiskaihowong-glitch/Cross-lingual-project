@@ -28,13 +28,6 @@ on:
               - kimi-k2.5
               - mistral-large-3
 
-        two_pass_judge:
-            description: 'Enable two-pass judging (extra leakage audit call for responses initially labelled REFUSAL)'
-            required: false
-            type: boolean
-            default: false
-
-
 jobs:
   evaluate-llm:
     runs-on: ubuntu-latest
@@ -78,11 +71,7 @@ jobs:
         GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       
       run: |
-        TWO_PASS_FLAG=""
-        if [ "${{ github.event.inputs.two_pass_judge }}" = "true" ]; then
-          TWO_PASS_FLAG="--two_pass_judge"
-        fi
-        python main_evaluate_llm.py "final_dataset_${{ github.event.inputs.language }}.csv" "${{ github.event.inputs.model_name }}" "${{ github.event.inputs.language }}" $TWO_PASS_FLAG
+        python main_evaluate_llm.py "final_dataset_${{ github.event.inputs.language }}.csv" "${{ github.event.inputs.model_name }}" "${{ github.event.inputs.language }}"
     
     - name: Debug - Check directory structure after
       run: |

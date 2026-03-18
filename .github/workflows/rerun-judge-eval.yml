@@ -31,11 +31,6 @@ on:
         required: false
         default: false
         type: boolean
-      two_pass_judge:
-        description: Enable two-pass judging (extra leakage audit for initial REFUSALs)
-        required: false
-        default: false
-        type: boolean
 
 jobs:
   rerun-judge:
@@ -74,10 +69,6 @@ jobs:
 
           if [ "${{ inputs.all_rows }}" = "true" ]; then
             CMD="$CMD --all_rows"
-          fi
-
-          if [ "${{ inputs.two_pass_judge }}" = "true" ]; then
-            CMD="$CMD --two_pass_judge"
           fi
 
           echo "Running: $CMD"

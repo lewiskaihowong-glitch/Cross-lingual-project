@@ -6,13 +6,12 @@ from pathlib import Path
 from main_evaluate_llm import classify_with_judge
 
 
-async def rerun_judge(input_path, output_path=None, only_refusals=True, two_pass_judge=False):
+async def rerun_judge(input_path, output_path=None, only_refusals=True):
 	input_file = Path(input_path)
 	with input_file.open("r", encoding="utf-8") as f:
 		data = json.load(f)
 
 	results = data.get("results", [])
-	leakage_overrides = 0
 	unchanged = 0
 
 	old_refusal_count = sum(
@@ -28,24 +27,18 @@ async def rerun_judge(input_path, output_path=None, only_refusals=True, two_pass
 		if row.get("is_block_or_filter"):
 			row["llm_judge_evaluation_v2"] = "CONTENT_FILTERED/BLOCKED"
 			row["is_refusal_v2"] = True
-			row["leakage_override_applied"] = False
 			unchanged += 1
 			continue
 
 		if only_refusals and old_label != "REFUSAL":
 			row["llm_judge_evaluation_v2"] = old_label
 			row["is_refusal_v2"] = old_label in ["REFUSAL", "CONTENT_FILTERED/BLOCKED"]
-			row["leakage_override_applied"] = False
 			unchanged += 1
 			continue
 
-		new_label = await classify_with_judge(response, two_pass=two_pass_judge)
-		if old_label == "REFUSAL" and new_label == "HARMFUL RESPONSE":
-			leakage_overrides += 1
-
+		new_label = await classify_with_judge(response)
 		row["llm_judge_evaluation_v2"] = new_label
 		row["is_refusal_v2"] = new_label in ["REFUSAL", "CONTENT_FILTERED/BLOCKED"]
-		row["leakage_override_applied"] = old_label == "REFUSAL" and new_label == "HARMFUL RESPONSE"
 
 	new_refusal_count = sum(1 for row in results if row.get("is_refusal_v2"))
 	total_entries = len(results)
@@ -56,10 +49,9 @@ async def rerun_judge(input_path, output_path=None, only_refusals=True, two_pass
 		"old_refusal_count": old_refusal_count,
 		"new_refusal_count": new_refusal_count,
 		"new_refusal_rate_percent": new_refusal_rate,
-		"leakage_overrides": leakage_overrides,
 		"unchanged_rows": unchanged,
 		"only_refusals_mode": only_refusals,
-		"judge_mode": "two-pass" if two_pass_judge else "one-pass",
+		"judge_mode": "one-pass",
 	}
 
 	# Keep the top-level summary aligned with rerun labels for downstream tools.
@@ -90,11 +82,6 @@ if __name__ == "__main__":
 		action="store_true",
 		help="Re-evaluate all rows, not only rows previously labeled REFUSAL",
 	)
-	parser.add_argument(
-		"--two_pass_judge",
-		action="store_true",
-		help="Enable two-pass judging (second leakage-audit call for initial REFUSAL labels)",
-	)
 	args = parser.parse_args()
 
 	asyncio.run(
@@ -102,6 +89,5 @@ if __name__ == "__main__":
 			args.input_json,
 			args.output_json,
 			only_refusals=not args.all_rows,
-			two_pass_judge=args.two_pass_judge,
 		)
 	)
