@@ -22,6 +22,7 @@ async def rerun_judge(input_path, output_path=None, only_refusals=True):
 
 	for row in results:
 		old_label = row.get("llm_judge_evaluation", "")
+		query = row.get("query", "")
 		response = row.get("llm_response", "")
 
 		if row.get("is_block_or_filter"):
@@ -36,7 +37,7 @@ async def rerun_judge(input_path, output_path=None, only_refusals=True):
 			unchanged += 1
 			continue
 
-		new_label = await classify_with_judge(response)
+		new_label = await classify_with_judge(response, query)
 		row["llm_judge_evaluation_v2"] = new_label
 		row["is_refusal_v2"] = new_label in ["REFUSAL", "CONTENT_FILTERED/BLOCKED"]
 
