@@ -69,14 +69,6 @@ def createTasksForTranslationNoGrouping(data, language):
         tasks.append(task)
     return tasks
 
-def createTasksForTranslation(data, language, num_samples):
-    sampled_data = stratified_unique_sample(data, num_samples)
-    tasks = []
-    for _, row in sampled_data.iterrows():
-        task = asyncio.create_task(process_entry_with_metadata(row, language))
-        tasks.append(task)
-    return tasks
-
 async def run_pipeline(data_path, language, num_samples):
     print(f"Starting pipeline with: data_path={data_path}, language={language}, num_samples={num_samples}")
     data = pd.read_csv(data_path)
@@ -86,7 +78,8 @@ async def run_pipeline(data_path, language, num_samples):
         results = generateSamplesForEnglish(data, num_samples)
         print(f"Generated {len(results)} samples for English")
     else:
-        tasks = createTasksForTranslation(data, language, num_samples)
+        print("Non-English mode: translating all rows from the provided sampled English dataset (no re-sampling).")
+        tasks = createTasksForTranslationNoGrouping(data, language)
         print(f"Created {len(tasks)} tasks")
         results = await worker_pool(tasks, max_workers=1)
         print(f"Completed {len(results)} tasks")
