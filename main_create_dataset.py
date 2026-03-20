@@ -58,7 +58,7 @@ async def process_entry_with_metadata(row, language):
     result = await process_entry(row["question"], language)
     if result is None:
         return None
-    result["prompt_type"] = row.get("content_policy_name", "UNKNOWN")
+    result["prompt_type"] = row.get("prompt_type", row.get("content_policy_name", "UNKNOWN"))
     return result
 
 
