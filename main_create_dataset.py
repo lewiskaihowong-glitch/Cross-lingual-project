@@ -117,7 +117,7 @@ if __name__ == "__main__":
     parser.add_argument("num_samples", type=int, help="Number of samples to take from ")
     args = parser.parse_args()
                         
-    data_path = f"data/raw/{args.data_path}"
+    data_path = f"data/final/{args.data_path}"
     language = args.language
     num_samples = args.num_samples
     asyncio.run(run_pipeline(data_path, language, num_samples))
