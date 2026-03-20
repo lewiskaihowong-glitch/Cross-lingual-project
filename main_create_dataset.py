@@ -10,8 +10,11 @@ def stratified_unique_sample(data, num_samples, group_col="content_policy_id"):
     if group_col not in data.columns:
         raise KeyError(f"Missing required grouping column: {group_col}")
 
-    # Prefer q_id as the stable unique key when available; fallback to question text.
-    dedupe_cols = ["q_id"] if "q_id" in data.columns else ["question"]
+    # q_id can repeat across groups, so include group key when available.
+    if "q_id" in data.columns:
+        dedupe_cols = [group_col, "q_id"]
+    else:
+        dedupe_cols = [group_col, "question"]
     unique_data = data.drop_duplicates(subset=dedupe_cols)
 
     sampled_groups = []
@@ -83,7 +86,7 @@ async def run_pipeline(data_path, language, num_samples):
         results = generateSamplesForEnglish(data, num_samples)
         print(f"Generated {len(results)} samples for English")
     else:
-        tasks = createTasksForTranslationNoGrouping(data, language)
+        tasks = createTasksForTranslation(data, language, num_samples)
         print(f"Created {len(tasks)} tasks")
         results = await worker_pool(tasks, max_workers=1)
         print(f"Completed {len(results)} tasks")
