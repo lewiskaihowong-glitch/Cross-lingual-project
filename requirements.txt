@@ -1,5 +1,5 @@
 # Core dependencies
-litellm>=1.0.0
+litellm==1.82.3
 python-dotenv>=1.0.0
 aiolimiter>=1.0.0
 tenacity>=8.0.0
