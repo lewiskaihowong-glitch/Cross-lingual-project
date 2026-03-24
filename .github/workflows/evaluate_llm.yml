@@ -53,8 +53,10 @@ jobs:
       run: |
         python -m pip install --upgrade "pip<26"
         python -m pip --version
-        python -m pip index versions litellm || true
-        python -m pip install --retries 5 --timeout 60 --index-url https://pypi.org/simple -r requirements.txt
+        # Temporary workaround: litellm is currently quarantined on PyPI.
+        grep -v '^litellm' requirements.txt > requirements.ci.txt
+        python -m pip install --retries 5 --timeout 60 --index-url https://pypi.org/simple -r requirements.ci.txt
+        python -m pip install --retries 5 --timeout 60 "git+https://github.com/BerriAI/litellm.git@main#egg=litellm"
     
     - name: Create output directory
       run: mkdir -p data/evaluation_results
