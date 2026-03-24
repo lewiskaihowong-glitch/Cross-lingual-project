@@ -1,5 +1,6 @@
 # Core dependencies
-litellm==1.82.3
+# PyPI is currently quarantined for litellm; pin to the matching Git tag instead.
+litellm @ git+https://github.com/BerriAI/litellm.git@v1.82.3
 python-dotenv>=1.0.0
 aiolimiter>=1.0.0
 tenacity>=8.0.0
