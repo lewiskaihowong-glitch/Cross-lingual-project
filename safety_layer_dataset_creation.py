@@ -1,15 +1,29 @@
 """Create the dataset for investigating safety layers in LLMs"""
 
 import json
-
+import argparse
 import pandas as pd
 
 english_seed_data = pd.read_csv("data/raw/english.csv")
+english_final_data = pd.read_csv("data/final/final_dataset_English.csv")
 
 languages = ["Amharic", "Irish", "Korean", "Hindi", "English", "Spanish"]
 languages_no_english = ["Amharic", "Irish", "Korean", "Hindi", "Spanish"]
 models = ["gpt-5-mini", "kimi-k2.5", "deepseek-v3.2", "mistral-large-3", "2.5-flash"]
 
+HIGH_INTENT_POLICIES = ["Illegal Activity", "Malware", "Fraud"]
+CONTROL_POLICIES = ["Economic Harm", "Political Lobbying", "Legal Opinion", "Financial Advice"]
+
+# Stable policy IDs used in output datasets.
+POLICY_IDS = {
+    "Illegal Activity": 0,
+    "Malware": 1,
+    "Economic Harm": 2,
+    "Fraud": 3,
+    "Political Lobbying": 4,
+    "Legal Opinion": 5,
+    "Financial Advice": 6,
+}
 
 dataset = pd.read_csv(f"data/final/final_dataset_Amharic_100.csv")
 policies = {
@@ -32,33 +46,44 @@ max_failures = {
     "Financial Advice": 0,
 }
 
-def get_failures_by_policy(model_responses):
+def get_failures_by_prompt_type(model_responses):
+    """Calculate harmful response rate per prompt type from model responses."""
     failures_weight = {}
-    number_per_group = 14
-    cur_policy = 0
-    start = 0
-    while cur_policy < len(policies):
-        failures = 0
-        group = model_responses.iloc[start: start+number_per_group]
-        policy = policies[cur_policy]
-        for index, row in group.iterrows():
-            is_refusal = row['is_refusal']
-            if not is_refusal:
-                failures += 1
+    
+    # Group by prompt_type if available in the data
+    if 'prompt_type' in model_responses.columns:
+        for prompt_type in model_responses['prompt_type'].unique():
+            group = model_responses[model_responses['prompt_type'] == prompt_type]
+            # Count only truly harmful responses
+            harmful = sum(1 for _, row in group.iterrows() 
+                         if row['llm_judge_evaluation'] == 'HARMFUL RESPONSE')
+            failure_rate = harmful / len(group)
+            failures_weight[prompt_type] = failure_rate
+    else:
+        # Fallback to old method if prompt_type column doesn't exist
+        number_per_group = 14
+        cur_policy = 0
+        start = 0
+        while cur_policy < len(policies):
+            failures = 0
+            group = model_responses.iloc[start: start+number_per_group]
+            policy = policies[cur_policy]
+            for index, row in group.iterrows():
+                is_refusal = row['is_refusal']
+                if not is_refusal:
+                    failures += 1
             
-        failure_rate = failures / number_per_group
-        if failure_rate > max_failures[policy]:
-            max_failures[policy] = failure_rate
-        failures_weight[policy] = failure_rate
-        cur_policy += 1
-        start += number_per_group
+            failure_rate = failures / number_per_group
+            failures_weight[policy] = failure_rate
+            cur_policy += 1
+            start += number_per_group
+    
     return failures_weight
     
 
 def get_failures_per_model_language():
     failures_dict = {}
     for language in languages:
-        failures_per_model = []
         failures_per_model_dict = {}
         for model in models:
             try:
@@ -67,10 +92,9 @@ def get_failures_per_model_language():
             except Exception as e:
                 model_responses = pd.read_csv(f"data/evaluation_results/evaluation_results_{model}_{language}.csv")
             
-            failures_per_model_language = get_failures_by_policy(model_responses)
-            failures_per_model_dict[model] = failures_per_model_language
-        failures_per_model.append(failures_per_model_dict)
-        failures_dict[language] = failures_per_model
+            failures_per_prompt_type = get_failures_by_prompt_type(model_responses)
+            failures_per_model_dict[model] = failures_per_prompt_type
+        failures_dict[language] = failures_per_model_dict
     return failures_dict
 
 
@@ -81,6 +105,48 @@ def get_sampled_data_for_policy(policy, sample_size):
     sample_data = data_by_policy.sample(n=sample_size, replace=replace, random_state=42)
     print(f"  Sampled {sample_size} rows from {available_size} available (replace={replace})")
     return sample_data
+
+
+def sample_evenly_by_prompt_type(df, prompt_types, total_size, seed=42):
+    """Sample rows as evenly as possible across prompt types."""
+    if total_size <= 0 or not prompt_types:
+        return pd.DataFrame(columns=df.columns)
+
+    base = total_size // len(prompt_types)
+    remainder = total_size % len(prompt_types)
+
+    sampled_parts = []
+    for i, prompt_type in enumerate(prompt_types):
+        n = base + (1 if i < remainder else 0)
+        if n <= 0:
+            continue
+
+        group = df[df["prompt_type"] == prompt_type]
+        if group.empty:
+            print(f"  Warning: No rows available for prompt_type={prompt_type}")
+            continue
+
+        replace = n > len(group)
+        sampled = group.sample(n=n, replace=replace, random_state=seed + i)
+        sampled_parts.append(sampled)
+        print(f"  {prompt_type}: sampled {n} from {len(group)} (replace={replace})")
+
+    if not sampled_parts:
+        return pd.DataFrame(columns=df.columns)
+
+    return pd.concat(sampled_parts, ignore_index=True)
+
+
+def format_safety_layer_output(df, language="English"):
+    """Create a stable output schema compatible with existing scripts."""
+    out = pd.DataFrame()
+    out["content_policy_name"] = df["prompt_type"]
+    out["content_policy_id"] = out["content_policy_name"].map(POLICY_IDS).fillna(-1).astype(int)
+    out["q_id"] = range(len(out))
+    out["question"] = df["question"]
+    out["language"] = language
+    out["prompt_type"] = df["prompt_type"]
+    return out[["content_policy_id", "content_policy_name", "q_id", "question", "language", "prompt_type"]]
 
 def create_safety_layer_dataset_other_languages():
     safety_layer_english = pd.read_csv("data/final/safety_layer_dataset_English.csv").copy()
@@ -113,36 +179,164 @@ def create_safety_layer_dataset_other_languages():
         
         safety_layer_translated = safety_layer_english.copy()
         safety_layer_translated['question'] = translated_questions
+        safety_layer_translated['language'] = language
         
         print(f"Created safety layer dataset for {language} with {len(safety_layer_translated)} rows")
         safety_layer_translated.to_csv(f"data/final/safety_layer_dataset_{language}.csv", index=False)
+
+
+def translate_safety_layer_dataset(safety_layer_english, language):
+    """Translate English safety-layer questions into the requested language."""
+    translated_data = pd.read_csv(f"data/final/final_dataset_{language}.csv")
+    translation_dict = dict(zip(translated_data["original_query"], translated_data["translated_query"]))
+
+    translated_questions = []
+    missing_count = 0
+    for _, row in safety_layer_english.iterrows():
+        question = row["question"]
+        if question in translation_dict:
+            translated_questions.append(translation_dict[question])
+        else:
+            missing_count += 1
+            print(f"  Warning: No translation found for: {question[:50]}...")
+            translated_questions.append(question)
+
+    print(f"\nTotal questions: {len(safety_layer_english)}")
+    print(f"Translations found: {len(safety_layer_english) - missing_count}")
+    print(f"Missing translations: {missing_count}")
+
+    translated = safety_layer_english.copy()
+    translated["question"] = translated_questions
+    translated["language"] = language
+    return translated
     
-def create_safety_layer_dataset(target_size=125):
-    safety_layer_data = []
-    rate_total = sum(max_failures.values())
-    print(f"Total Failure Rate across all policies: {rate_total}")
+def create_safety_layer_dataset(
+    target_size=60,
+    high_intent_share=0.85,
+    include_controls=True,
+    output_language="English",
+):
+    """
+    Create a high-intent-focused safety layer dataset.
+
+    Defaults produce a dataset dominated by high-intent harmful categories
+    (Illegal Activity, Malware, Fraud), plus a small control slice.
+    """
     print(f"Target dataset size: {target_size}")
-    print(max_failures)
-    
-    # Calculate proportions and convert to sample sizes
-    for policy in max_failures.keys():
-        proportion = max_failures[policy] / rate_total if rate_total > 0 else 0
-        sample_size = int(proportion * target_size)
-        
-        print(f"Policy: {policy}, Proportion: {proportion:.3f}, Sample Size: {sample_size}")
-        sampled_data = get_sampled_data_for_policy(policy, sample_size)
-        safety_layer_data.append(sampled_data)
-    
-    final_safety_layer_dataset = pd.concat(safety_layer_data, ignore_index=True)
-    print(f"\nFinal dataset size: {len(final_safety_layer_dataset)} rows")
-    final_safety_layer_dataset.to_csv("data/final/safety_layer_dataset.csv", index=False)
+    print(f"High-intent share: {high_intent_share:.2f}")
+    print(f"Include controls: {include_controls}")
+
+    if target_size <= 0:
+        raise ValueError("target_size must be > 0")
+
+    if include_controls:
+        high_target = int(round(target_size * high_intent_share))
+        control_target = max(0, target_size - high_target)
+    else:
+        high_target = target_size
+        control_target = 0
+
+    print(f"High-intent rows target: {high_target}")
+    print(f"Control rows target: {control_target}")
+
+    high_intent_data = sample_evenly_by_prompt_type(
+        english_final_data,
+        HIGH_INTENT_POLICIES,
+        high_target,
+        seed=42,
+    )
+
+    control_data = pd.DataFrame(columns=english_final_data.columns)
+    if control_target > 0:
+        control_data = sample_evenly_by_prompt_type(
+            english_final_data,
+            CONTROL_POLICIES,
+            control_target,
+            seed=142,
+        )
+
+    final_safety_layer_dataset = pd.concat([high_intent_data, control_data], ignore_index=True)
+    final_safety_layer_dataset = final_safety_layer_dataset.sample(
+        frac=1,
+        random_state=7,
+    ).reset_index(drop=True)
+
+    output_df = format_safety_layer_output(final_safety_layer_dataset, language="English")
+
+    print(f"\nFinal dataset size: {len(output_df)} rows")
+    print("Category distribution:")
+    print(output_df["content_policy_name"].value_counts().sort_index())
+
+    output_df.to_csv("data/final/safety_layer_dataset_English.csv", index=False)
+    # Keep legacy path for downstream compatibility.
+    output_df.to_csv("data/final/safety_layer_dataset.csv", index=False)
+    print("Saved: data/final/safety_layer_dataset_English.csv")
+    print("Saved: data/final/safety_layer_dataset.csv")
+
+    if output_language == "All":
+        for language in languages_no_english:
+            print(f"\n{'=' * 50}")
+            print(f"Processing {language}")
+            print(f"{'=' * 50}")
+            translated_df = translate_safety_layer_dataset(output_df, language)
+            translated_df.to_csv(f"data/final/safety_layer_dataset_{language}.csv", index=False)
+            print(f"Created safety layer dataset for {language} with {len(translated_df)} rows")
+        return
+
+    if output_language != "English":
+        print(f"\n{'=' * 50}")
+        print(f"Processing {output_language}")
+        print(f"{'=' * 50}")
+        translated_df = translate_safety_layer_dataset(output_df, output_language)
+        translated_df.to_csv(f"data/final/safety_layer_dataset_{output_language}.csv", index=False)
+        translated_df.to_csv("data/final/safety_layer_dataset.csv", index=False)
+        print(f"Created safety layer dataset for {output_language} with {len(translated_df)} rows")
+        print("Updated: data/final/safety_layer_dataset.csv")
         
     
 if __name__ == "__main__":
-    # failures_per_model_language = get_failures_per_model_language()
-    # with open('data/failures_per_model_language.json', 'w', encoding='utf-8') as f:
-    #     json.dump(failures_per_model_language, f, ensure_ascii=False, indent=4)
-    # create_safety_layer_dataset()
-    create_safety_layer_dataset_other_languages()
+    parser = argparse.ArgumentParser(description="Create focused safety-layer datasets")
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="English",
+        choices=languages + ["All"],
+        help="Output language for safety-layer dataset (or 'All').",
+    )
+    parser.add_argument(
+        "--target-size",
+        type=int,
+        default=60,
+        help="Target number of rows in the English base sample.",
+    )
+    parser.add_argument(
+        "--high-intent-share",
+        type=float,
+        default=0.85,
+        help="Share of rows allocated to high-intent harmful categories.",
+    )
+    parser.add_argument(
+        "--no-controls",
+        action="store_true",
+        help="If set, do not include control categories.",
+    )
+    parser.add_argument(
+        "--write-failures",
+        action="store_true",
+        help="If set, regenerate data/failures_per_model_language.json.",
+    )
+    args = parser.parse_args()
+
+    if args.write_failures:
+        failures_per_model_language = get_failures_per_model_language()
+        with open("data/failures_per_model_language.json", "w", encoding="utf-8") as f:
+            json.dump(failures_per_model_language, f, ensure_ascii=False, indent=4)
+
+    create_safety_layer_dataset(
+        target_size=args.target_size,
+        high_intent_share=args.high_intent_share,
+        include_controls=not args.no_controls,
+        output_language=args.language,
+    )
     
     
