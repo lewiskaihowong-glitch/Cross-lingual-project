@@ -2,6 +2,25 @@ name: Create Safety Layer Dataset
 
 on:
   workflow_dispatch:
+    inputs:
+      language:
+        description: "Dataset output language"
+        required: true
+        default: "English"
+        type: choice
+        options:
+          - English
+          - Amharic
+          - Irish
+          - Korean
+          - Hindi
+          - Spanish
+          - All
+      num_entries:
+        description: "Number of rows in the dataset"
+        required: true
+        default: "60"
+        type: string
 
 jobs:
   create-safety-layer-dataset:
@@ -30,7 +49,7 @@ jobs:
 
       - name: Create focused safety layer datasets
         run: |
-          python safety_layer_dataset_creation.py
+          python safety_layer_dataset_creation.py --language "${{ inputs.language }}" --target-size "${{ inputs.num_entries }}"
 
       - name: Check for changes
         id: git-check

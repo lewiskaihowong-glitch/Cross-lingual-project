@@ -107,7 +107,7 @@ def get_sampled_data_for_policy(policy, sample_size):
     return sample_data
 
 
-def sample_evenly_by_prompt_type(df, prompt_types, total_size, seed=42):
+def sample_evenly_by_prompt_type(df, prompt_types, total_size, seed=42, allow_duplicates=False):
     """Sample rows as evenly as possible across prompt types."""
     if total_size <= 0 or not prompt_types:
         return pd.DataFrame(columns=df.columns)
@@ -126,7 +126,10 @@ def sample_evenly_by_prompt_type(df, prompt_types, total_size, seed=42):
             print(f"  Warning: No rows available for prompt_type={prompt_type}")
             continue
 
-        replace = n > len(group)
+        if not allow_duplicates and n > len(group):
+            n = len(group)
+
+        replace = allow_duplicates and (n > len(group))
         sampled = group.sample(n=n, replace=replace, random_state=seed + i)
         sampled_parts.append(sampled)
         print(f"  {prompt_type}: sampled {n} from {len(group)} (replace={replace})")
@@ -215,6 +218,7 @@ def create_safety_layer_dataset(
     high_intent_share=0.85,
     include_controls=True,
     output_language="English",
+    allow_duplicates=False,
 ):
     """
     Create a high-intent-focused safety layer dataset.
@@ -225,9 +229,20 @@ def create_safety_layer_dataset(
     print(f"Target dataset size: {target_size}")
     print(f"High-intent share: {high_intent_share:.2f}")
     print(f"Include controls: {include_controls}")
+    print(f"Allow duplicates: {allow_duplicates}")
 
     if target_size <= 0:
         raise ValueError("target_size must be > 0")
+
+    selected_policies = HIGH_INTENT_POLICIES + (CONTROL_POLICIES if include_controls else [])
+    eligible_pool = english_final_data[english_final_data["prompt_type"].isin(selected_policies)]
+    max_unique_size = len(eligible_pool)
+    if (not allow_duplicates) and target_size > max_unique_size:
+        print(
+            f"Requested target_size={target_size} exceeds available unique rows ({max_unique_size}) "
+            f"for selected policies. Clipping target_size to {max_unique_size}."
+        )
+        target_size = max_unique_size
 
     if include_controls:
         high_target = int(round(target_size * high_intent_share))
@@ -244,6 +259,7 @@ def create_safety_layer_dataset(
         HIGH_INTENT_POLICIES,
         high_target,
         seed=42,
+        allow_duplicates=allow_duplicates,
     )
 
     control_data = pd.DataFrame(columns=english_final_data.columns)
@@ -253,9 +269,26 @@ def create_safety_layer_dataset(
             CONTROL_POLICIES,
             control_target,
             seed=142,
+            allow_duplicates=allow_duplicates,
         )
 
     final_safety_layer_dataset = pd.concat([high_intent_data, control_data], ignore_index=True)
+
+    # If no duplicates are allowed and category-wise allocation underfills,
+    # top up from the remaining eligible pool.
+    if (not allow_duplicates) and len(final_safety_layer_dataset) < target_size:
+        needed = target_size - len(final_safety_layer_dataset)
+        selected_questions = set(final_safety_layer_dataset["question"].tolist())
+        remaining_pool = eligible_pool[~eligible_pool["question"].isin(selected_questions)]
+        top_up_size = min(needed, len(remaining_pool))
+        if top_up_size > 0:
+            top_up_data = remaining_pool.sample(n=top_up_size, replace=False, random_state=207)
+            final_safety_layer_dataset = pd.concat(
+                [final_safety_layer_dataset, top_up_data],
+                ignore_index=True,
+            )
+            print(f"Top-up added {top_up_size} rows to reach target size without duplicates")
+
     final_safety_layer_dataset = final_safety_layer_dataset.sample(
         frac=1,
         random_state=7,
@@ -325,6 +358,11 @@ if __name__ == "__main__":
         action="store_true",
         help="If set, regenerate data/failures_per_model_language.json.",
     )
+    parser.add_argument(
+        "--allow-duplicates",
+        action="store_true",
+        help="If set, allow sampling with replacement when needed.",
+    )
     args = parser.parse_args()
 
     if args.write_failures:
@@ -337,6 +375,7 @@ if __name__ == "__main__":
         high_intent_share=args.high_intent_share,
         include_controls=not args.no_controls,
         output_language=args.language,
+        allow_duplicates=args.allow_duplicates,
     )
     
     
