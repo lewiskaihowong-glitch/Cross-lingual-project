@@ -319,7 +319,9 @@ def create_safety_layer_dataset(
 
         output_df.to_csv("data/final/safety_layer_dataset_English.csv", index=False)
         # Keep legacy path for downstream compatibility.
+        output_df.to_csv("data/final/safety_layer_dataset.csv", index=False)
         print("Saved: data/final/safety_layer_dataset_English.csv")
+        print("Saved: data/final/safety_layer_dataset.csv")
     else:
         output_df = pd.read_csv(english_output_path)
         print(
