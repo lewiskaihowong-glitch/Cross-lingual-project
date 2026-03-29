@@ -149,15 +149,13 @@ def sample_evenly_by_prompt_type(df, prompt_types, total_size, seed=42, allow_du
 
 
 def format_safety_layer_output(df, language="English"):
-    """Create a stable output schema compatible with existing scripts."""
+    """Create a stable output schema with only essential columns."""
     out = pd.DataFrame()
-    out["content_policy_name"] = df["prompt_type"]
-    out["content_policy_id"] = out["content_policy_name"].map(POLICY_IDS).fillna(-1).astype(int)
-    out["q_id"] = range(len(out))
+    out["q_id"] = range(len(df))
     out["question"] = df["question"]
     out["language"] = language
     out["prompt_type"] = df["prompt_type"]
-    return out[["content_policy_id", "content_policy_name", "q_id", "question", "language", "prompt_type"]]
+    return out[["q_id", "question", "language", "prompt_type"]]
 
 def create_safety_layer_dataset_other_languages():
     safety_layer_english = pd.read_csv("data/final/safety_layer_dataset_English.csv").copy()
@@ -314,7 +312,7 @@ def create_safety_layer_dataset(
 
         print(f"\nFinal dataset size: {len(output_df)} rows")
         print("Category distribution:")
-        print(output_df["content_policy_name"].value_counts().sort_index())
+        print(output_df["prompt_type"].value_counts().sort_index())
 
         output_df.to_csv("data/final/safety_layer_dataset_English.csv", index=False)
         # Keep legacy path for downstream compatibility.
