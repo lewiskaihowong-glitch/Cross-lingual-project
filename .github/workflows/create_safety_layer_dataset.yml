@@ -20,6 +20,26 @@ on:
         required: true
         default: "60"
         type: string
+      high_intent_share:
+        description: "Share of rows for high-intent categories (0.0 to 1.0)"
+        required: true
+        default: "0.85"
+        type: string
+      include_controls:
+        description: "Include control categories"
+        required: true
+        default: true
+        type: boolean
+      allow_duplicates:
+        description: "Allow duplicate sampled rows"
+        required: true
+        default: false
+        type: boolean
+      write_failures:
+        description: "Regenerate failures_per_model_language.json"
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   create-safety-layer-dataset:
@@ -52,7 +72,25 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
         run: |
-          python safety_layer_dataset_creation.py --language "${{ inputs.language }}" --target-size "${{ inputs.num_entries }}"
+          EXTRA_ARGS=""
+
+          if [ "${{ inputs.include_controls }}" = "false" ]; then
+            EXTRA_ARGS="$EXTRA_ARGS --no-controls"
+          fi
+
+          if [ "${{ inputs.allow_duplicates }}" = "true" ]; then
+            EXTRA_ARGS="$EXTRA_ARGS --allow-duplicates"
+          fi
+
+          if [ "${{ inputs.write_failures }}" = "true" ]; then
+            EXTRA_ARGS="$EXTRA_ARGS --write-failures"
+          fi
+
+          python safety_layer_dataset_creation.py \
+            --language "${{ inputs.language }}" \
+            --target-size "${{ inputs.num_entries }}" \
+            --high-intent-share "${{ inputs.high_intent_share }}" \
+            $EXTRA_ARGS
 
       - name: Check for changes
         id: git-check
