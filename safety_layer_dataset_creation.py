@@ -2,10 +2,18 @@
 
 import json
 import argparse
+import asyncio
+from pathlib import Path
 import pandas as pd
+from core.translator import process_entry
 
 english_seed_data = pd.read_csv("data/raw/english.csv")
-english_final_data = pd.read_csv("data/final/final_dataset_English.csv")
+
+# Canonical English sampling pool for safety-layer dataset construction.
+# We normalize schema to match the downstream sampler expectations.
+english_sampling_data = english_seed_data.rename(
+    columns={"content_policy_name": "prompt_type"}
+)[["question", "prompt_type"]].copy()
 
 languages = ["Amharic", "Irish", "Korean", "Hindi", "English", "Spanish"]
 languages_no_english = ["Amharic", "Irish", "Korean", "Hindi", "Spanish"]
@@ -188,25 +196,29 @@ def create_safety_layer_dataset_other_languages():
         safety_layer_translated.to_csv(f"data/final/safety_layer_dataset_{language}.csv", index=False)
 
 
-def translate_safety_layer_dataset(safety_layer_english, language):
-    """Translate English safety-layer questions into the requested language."""
-    translated_data = pd.read_csv(f"data/final/final_dataset_{language}.csv")
-    translation_dict = dict(zip(translated_data["original_query"], translated_data["translated_query"]))
+async def translate_safety_layer_dataset(safety_layer_english, language, max_workers=1):
+    """Translate English safety-layer questions into the requested language using the translator API."""
+    from main_create_dataset import worker_pool
+
+    questions = safety_layer_english["question"].tolist()
+    tasks = [process_entry(q, language) for q in questions]
+
+    print(f"\nTranslating {len(tasks)} questions to {language}...")
+    results = await worker_pool(tasks, max_workers=max_workers)
 
     translated_questions = []
-    missing_count = 0
-    for _, row in safety_layer_english.iterrows():
-        question = row["question"]
-        if question in translation_dict:
-            translated_questions.append(translation_dict[question])
+    failed_count = 0
+    for question, result in zip(questions, results):
+        if result and "translated_query" in result:
+            translated_questions.append(result["translated_query"])
         else:
-            missing_count += 1
-            print(f"  Warning: No translation found for: {question[:50]}...")
+            failed_count += 1
+            print(f"  Warning: Failed to translate: {question[:50]}...")
             translated_questions.append(question)
 
     print(f"\nTotal questions: {len(safety_layer_english)}")
-    print(f"Translations found: {len(safety_layer_english) - missing_count}")
-    print(f"Missing translations: {missing_count}")
+    print(f"Translations succeeded: {len(safety_layer_english) - failed_count}")
+    print(f"Failed translations: {failed_count}")
 
     translated = safety_layer_english.copy()
     translated["question"] = translated_questions
@@ -234,93 +246,93 @@ def create_safety_layer_dataset(
     if target_size <= 0:
         raise ValueError("target_size must be > 0")
 
-    selected_policies = HIGH_INTENT_POLICIES + (CONTROL_POLICIES if include_controls else [])
-    eligible_pool = english_final_data[english_final_data["prompt_type"].isin(selected_policies)]
-    max_unique_size = len(eligible_pool)
-    if (not allow_duplicates) and target_size > max_unique_size:
-        print(
-            f"Requested target_size={target_size} exceeds available unique rows ({max_unique_size}) "
-            f"for selected policies. Clipping target_size to {max_unique_size}."
-        )
-        target_size = max_unique_size
+    english_output_path = Path("data/final/safety_layer_dataset_English.csv")
 
-    if include_controls:
-        high_target = int(round(target_size * high_intent_share))
-        control_target = max(0, target_size - high_target)
-    else:
-        high_target = target_size
-        control_target = 0
+    # Build the English base once and reuse it for all non-English generations.
+    if output_language == "English" or not english_output_path.exists():
+        selected_policies = HIGH_INTENT_POLICIES + (CONTROL_POLICIES if include_controls else [])
+        eligible_pool = english_sampling_data[english_sampling_data["prompt_type"].isin(selected_policies)]
+        max_unique_size = len(eligible_pool)
+        if (not allow_duplicates) and target_size > max_unique_size:
+            print(
+                f"Requested target_size={target_size} exceeds available unique rows ({max_unique_size}) "
+                f"for selected policies. Clipping target_size to {max_unique_size}."
+            )
+            target_size = max_unique_size
 
-    print(f"High-intent rows target: {high_target}")
-    print(f"Control rows target: {control_target}")
+        if include_controls:
+            high_target = int(round(target_size * high_intent_share))
+            control_target = max(0, target_size - high_target)
+        else:
+            high_target = target_size
+            control_target = 0
 
-    high_intent_data = sample_evenly_by_prompt_type(
-        english_final_data,
-        HIGH_INTENT_POLICIES,
-        high_target,
-        seed=42,
-        allow_duplicates=allow_duplicates,
-    )
+        print(f"High-intent rows target: {high_target}")
+        print(f"Control rows target: {control_target}")
 
-    control_data = pd.DataFrame(columns=english_final_data.columns)
-    if control_target > 0:
-        control_data = sample_evenly_by_prompt_type(
-            english_final_data,
-            CONTROL_POLICIES,
-            control_target,
-            seed=142,
+        high_intent_data = sample_evenly_by_prompt_type(
+            english_sampling_data,
+            HIGH_INTENT_POLICIES,
+            high_target,
+            seed=42,
             allow_duplicates=allow_duplicates,
         )
 
-    final_safety_layer_dataset = pd.concat([high_intent_data, control_data], ignore_index=True)
-
-    # If no duplicates are allowed and category-wise allocation underfills,
-    # top up from the remaining eligible pool.
-    if (not allow_duplicates) and len(final_safety_layer_dataset) < target_size:
-        needed = target_size - len(final_safety_layer_dataset)
-        selected_questions = set(final_safety_layer_dataset["question"].tolist())
-        remaining_pool = eligible_pool[~eligible_pool["question"].isin(selected_questions)]
-        top_up_size = min(needed, len(remaining_pool))
-        if top_up_size > 0:
-            top_up_data = remaining_pool.sample(n=top_up_size, replace=False, random_state=207)
-            final_safety_layer_dataset = pd.concat(
-                [final_safety_layer_dataset, top_up_data],
-                ignore_index=True,
+        control_data = pd.DataFrame(columns=english_sampling_data.columns)
+        if control_target > 0:
+            control_data = sample_evenly_by_prompt_type(
+                english_sampling_data,
+                CONTROL_POLICIES,
+                control_target,
+                seed=142,
+                allow_duplicates=allow_duplicates,
             )
-            print(f"Top-up added {top_up_size} rows to reach target size without duplicates")
 
-    final_safety_layer_dataset = final_safety_layer_dataset.sample(
-        frac=1,
-        random_state=7,
-    ).reset_index(drop=True)
+        final_safety_layer_dataset = pd.concat([high_intent_data, control_data], ignore_index=True)
 
-    output_df = format_safety_layer_output(final_safety_layer_dataset, language="English")
+        # If no duplicates are allowed and category-wise allocation underfills,
+        # top up from the remaining eligible pool.
+        if (not allow_duplicates) and len(final_safety_layer_dataset) < target_size:
+            needed = target_size - len(final_safety_layer_dataset)
+            selected_questions = set(final_safety_layer_dataset["question"].tolist())
+            remaining_pool = eligible_pool[~eligible_pool["question"].isin(selected_questions)]
+            top_up_size = min(needed, len(remaining_pool))
+            if top_up_size > 0:
+                top_up_data = remaining_pool.sample(n=top_up_size, replace=False, random_state=207)
+                final_safety_layer_dataset = pd.concat(
+                    [final_safety_layer_dataset, top_up_data],
+                    ignore_index=True,
+                )
+                print(f"Top-up added {top_up_size} rows to reach target size without duplicates")
 
-    print(f"\nFinal dataset size: {len(output_df)} rows")
-    print("Category distribution:")
-    print(output_df["content_policy_name"].value_counts().sort_index())
+        final_safety_layer_dataset = final_safety_layer_dataset.sample(
+            frac=1,
+            random_state=7,
+        ).reset_index(drop=True)
 
-    output_df.to_csv("data/final/safety_layer_dataset_English.csv", index=False)
-    # Keep legacy path for downstream compatibility.
-    output_df.to_csv("data/final/safety_layer_dataset.csv", index=False)
-    print("Saved: data/final/safety_layer_dataset_English.csv")
-    print("Saved: data/final/safety_layer_dataset.csv")
+        output_df = format_safety_layer_output(final_safety_layer_dataset, language="English")
 
-    if output_language == "All":
-        for language in languages_no_english:
-            print(f"\n{'=' * 50}")
-            print(f"Processing {language}")
-            print(f"{'=' * 50}")
-            translated_df = translate_safety_layer_dataset(output_df, language)
-            translated_df.to_csv(f"data/final/safety_layer_dataset_{language}.csv", index=False)
-            print(f"Created safety layer dataset for {language} with {len(translated_df)} rows")
-        return
+        print(f"\nFinal dataset size: {len(output_df)} rows")
+        print("Category distribution:")
+        print(output_df["content_policy_name"].value_counts().sort_index())
+
+        output_df.to_csv("data/final/safety_layer_dataset_English.csv", index=False)
+        # Keep legacy path for downstream compatibility.
+        output_df.to_csv("data/final/safety_layer_dataset.csv", index=False)
+        print("Saved: data/final/safety_layer_dataset_English.csv")
+        print("Saved: data/final/safety_layer_dataset.csv")
+    else:
+        output_df = pd.read_csv(english_output_path)
+        print(
+            "Using existing English base sample from data/final/safety_layer_dataset_English.csv "
+            "to keep cross-language datasets aligned."
+        )
 
     if output_language != "English":
         print(f"\n{'=' * 50}")
         print(f"Processing {output_language}")
         print(f"{'=' * 50}")
-        translated_df = translate_safety_layer_dataset(output_df, output_language)
+        translated_df = asyncio.run(translate_safety_layer_dataset(output_df, output_language))
         translated_df.to_csv(f"data/final/safety_layer_dataset_{output_language}.csv", index=False)
         translated_df.to_csv("data/final/safety_layer_dataset.csv", index=False)
         print(f"Created safety layer dataset for {output_language} with {len(translated_df)} rows")
@@ -333,8 +345,8 @@ if __name__ == "__main__":
         "--language",
         type=str,
         default="English",
-        choices=languages + ["All"],
-        help="Output language for safety-layer dataset (or 'All').",
+        choices=languages,
+        help="Output language for safety-layer dataset.",
     )
     parser.add_argument(
         "--target-size",

@@ -15,7 +15,6 @@ on:
           - Korean
           - Hindi
           - Spanish
-          - All
       num_entries:
         description: "Number of rows in the dataset"
         required: true
@@ -48,6 +47,10 @@ jobs:
           pip install -r requirements.txt
 
       - name: Create focused safety layer datasets
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
         run: |
           python safety_layer_dataset_creation.py --language "${{ inputs.language }}" --target-size "${{ inputs.num_entries }}"
 
