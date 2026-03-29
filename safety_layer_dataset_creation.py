@@ -153,9 +153,10 @@ def format_safety_layer_output(df, language="English"):
     out = pd.DataFrame()
     out["q_id"] = range(len(df))
     out["question"] = df["question"]
+    out["original_english_query"] = df["question"]
     out["language"] = language
     out["prompt_type"] = df["prompt_type"]
-    return out[["q_id", "question", "language", "prompt_type"]]
+    return out[["q_id", "question", "original_english_query", "language", "prompt_type"]]
 
 def create_safety_layer_dataset_other_languages():
     safety_layer_english = pd.read_csv("data/final/safety_layer_dataset_English.csv").copy()
@@ -219,6 +220,8 @@ async def translate_safety_layer_dataset(safety_layer_english, language, max_wor
     print(f"Failed translations: {failed_count}")
 
     translated = safety_layer_english.copy()
+    if "original_english_query" not in translated.columns:
+        translated["original_english_query"] = questions
     translated["question"] = translated_questions
     translated["language"] = language
     return translated
@@ -316,9 +319,7 @@ def create_safety_layer_dataset(
 
         output_df.to_csv("data/final/safety_layer_dataset_English.csv", index=False)
         # Keep legacy path for downstream compatibility.
-        output_df.to_csv("data/final/safety_layer_dataset.csv", index=False)
         print("Saved: data/final/safety_layer_dataset_English.csv")
-        print("Saved: data/final/safety_layer_dataset.csv")
     else:
         output_df = pd.read_csv(english_output_path)
         print(
