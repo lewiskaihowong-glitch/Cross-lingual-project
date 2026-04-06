@@ -28,6 +28,44 @@ on:
               - kimi-k2.5
               - mistral-large-3
 
+        query_source:
+          description: 'Dataset column to use for model query'
+          required: true
+          type: choice
+          default: auto
+          options:
+            - auto
+            - question
+            - translated_query
+            - original_query
+
+        system_prompt_language:
+          description: 'Built-in system prompt language (or none)'
+          required: true
+          type: choice
+          default: none
+          options:
+            - none
+            - dataset
+            - English
+            - Amharic
+            - Korean
+            - Irish
+            - Hindi
+            - Spanish
+
+        system_prompt_text:
+          description: 'Custom system prompt text (optional; overrides system_prompt_language)'
+          required: false
+          type: string
+          default: ''
+
+        output_tag:
+          description: 'Optional output filename suffix (leave blank to auto-generate for system-prompt runs)'
+          required: false
+          type: string
+          default: ''
+
 jobs:
   evaluate-llm:
     runs-on: ubuntu-latest
@@ -71,12 +109,19 @@ jobs:
     
     - name: Run pipeline
       env:
-        AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }},
+        AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       
       run: |
-        python main_evaluate_llm.py "final_dataset_${{ github.event.inputs.language }}.csv" "${{ github.event.inputs.model_name }}" "${{ github.event.inputs.language }}"
+        python main_evaluate_llm.py \
+          "final_dataset_${{ github.event.inputs.language }}.csv" \
+          "${{ github.event.inputs.model_name }}" \
+          "${{ github.event.inputs.language }}" \
+          --query-source "${{ github.event.inputs.query_source }}" \
+          --system-prompt-language "${{ github.event.inputs.system_prompt_language }}" \
+          --system-prompt-text "${{ github.event.inputs.system_prompt_text }}" \
+          --output-tag "${{ github.event.inputs.output_tag }}"
     
     - name: Debug - Check directory structure after
       run: |
@@ -92,9 +137,9 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git pull origin main
-        git add data/evaluation_results/evaluation_results_${{ github.event.inputs.model_name }}_${{ github.event.inputs.language }}.json
+        git add data/evaluation_results/
         if [ -n "$(git status --porcelain)" ]; then
-          git commit -m "Add evaluation results for ${{ github.event.inputs.language }} using ${{ github.event.inputs.model_name }}"
+          git commit -m "Add evaluation results for ${{ github.event.inputs.language }} using ${{ github.event.inputs.model_name }} (query_source=${{ github.event.inputs.query_source }}, sys_prompt=${{ github.event.inputs.system_prompt_language }})"
           git push
           echo "Results committed and pushed to repository"
         else

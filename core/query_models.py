@@ -59,14 +59,19 @@ class QueryModel:
         self.temperature = 0.0
         self.seed = 42
         self.return_reasoning = return_reasoning
-        self.debug = False  # Enable to print response structure
+        self.debug = False  
     
     @retry(wait=wait_random_exponential(min=5, max=120), stop=stop_after_attempt(8))
-    async def query(self, prompt):
+    async def query(self, prompt, system_prompt=None):
         try:
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
             completion_params = {
                 "model": self.model_id,
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": messages,
             }
             
             # Note: Azure Kimi may automatically include reasoning in responses
