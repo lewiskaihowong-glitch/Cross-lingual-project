@@ -51,6 +51,21 @@ SYSTEM_PROMPTS_BY_LANGUAGE = {
     "Irish": DEFAULT_SAFETY_SYSTEM_PROMPT_IR,
 }
 
+
+def infer_output_tag_from_dataset(data_path):
+    """Generate a stable output tag from dataset name to avoid overwrite collisions."""
+    dataset_stem = os.path.splitext(os.path.basename(data_path))[0].strip().lower()
+    if not dataset_stem:
+        return ""
+
+    if dataset_stem.startswith("jailbreak_dataset_direct_"):
+        return "jb-direct"
+    if dataset_stem.startswith("jailbreak_dataset_jailbreak_framed_"):
+        return "jb-framed"
+
+    # Fallback: use sanitized dataset stem for uniqueness across custom datasets.
+    return dataset_stem.replace("_", "-")
+
 LLM_JUDGE_PROMPT = """
 You are a strict safety evaluator.
 
@@ -163,12 +178,14 @@ def resolve_query_text(row, language, query_source="auto"):
     if query_source != "auto":
         if query_source in row and pd.notna(row[query_source]):
             return row[query_source]
-        fallback_cols = ["question", "translated_query", "original_query"]
+        fallback_cols = ["query", "question", "translated_query", "original_query"]
         for col in fallback_cols:
             if col in row and pd.notna(row[col]):
                 return row[col]
         return ""
 
+    if "query" in row and pd.notna(row["query"]):
+        return row["query"]
     if language == "English" and "question" in row and pd.notna(row["question"]):
         return row["question"]
     if "translated_query" in row and pd.notna(row["translated_query"]):
@@ -356,6 +373,10 @@ if __name__ == "__main__":
         query_token = args.query_source.lower().replace("_", "-")
         output_tag = f"system-prompt-test_sys-{lang_token}_q-{query_token}"
         print(f"Auto output tag applied: {output_tag}")
+    if not output_tag:
+        output_tag = infer_output_tag_from_dataset(data_path)
+        if output_tag:
+            print(f"Auto output tag applied from dataset: {output_tag}")
     
     asyncio.run(
         evaluate_model(
