@@ -40,24 +40,6 @@ on:
           - question
           - translated_query
           - original_query
-      system_prompt_language:
-        description: 'Safety system prompt language used during evaluation'
-        required: true
-        type: choice
-        default: English
-        options:
-          - none
-          - English
-          - Amharic
-          - Korean
-          - Irish
-          - Hindi
-          - Spanish
-      system_prompt_text:
-        description: 'Optional custom system prompt text (overrides system_prompt_language)'
-        required: false
-        type: string
-        default: ''
       output_tag:
         description: 'Optional output filename suffix for the run'
         required: false
@@ -104,8 +86,6 @@ jobs:
             "${{ github.event.inputs.model_name }}" \
             "${{ github.event.inputs.language }}" \
             --query-source "${{ github.event.inputs.query_source }}" \
-            --system-prompt-language "${{ github.event.inputs.system_prompt_language }}" \
-            --system-prompt-text "${{ github.event.inputs.system_prompt_text }}" \
             --output-tag "${{ github.event.inputs.output_tag }}"
 
       - name: Upload result artifact
