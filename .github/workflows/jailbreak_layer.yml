@@ -53,8 +53,8 @@ jobs:
       PIP_INDEX_URL: https://pypi.org/simple
 
     permissions:
-      contents: read
-      actions: read
+      contents: write
+      actions: write
 
     steps:
       - name: Checkout repository
@@ -87,6 +87,20 @@ jobs:
             "${{ github.event.inputs.language }}" \
             --query-source "${{ github.event.inputs.query_source }}" \
             --output-tag "${{ github.event.inputs.output_tag }}"
+
+      - name: Commit and push results to repository
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git pull origin "${GITHUB_REF_NAME}"
+          git add data/evaluation_results/
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Add jailbreak evaluation results for ${{ github.event.inputs.language }} using ${{ github.event.inputs.model_name }} (data_path=${{ github.event.inputs.data_path }}, query_source=${{ github.event.inputs.query_source }})"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+            echo "Results committed and pushed to repository"
+          else
+            echo "No changes to commit"
+          fi
 
       - name: Upload result artifact
         uses: actions/upload-artifact@v4
