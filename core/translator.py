@@ -2,58 +2,25 @@ import asyncio
 from core.query_models import QueryModel, EmbeddingModel
 from core.similarity import calculate_similarity
 from core.model_registry import get_query_model 
+from prompts.translator_prompts import (
+    build_back_translation_prompt,
+    build_retry_translation_prompt,
+    build_translation_prompt,
+)
 
 async def translation(question, language):
-    translation_prompt = f"""You are a professional translator. Translate this English question into {language} with maximum accuracy.
-
-Requirements:
-- Preserve EXACT semantic meaning and intent
-- Maintain the same grammatical structure (question/statement/command)
-- Keep the same level of formality
-- Use natural, native-like phrasing in {language}
-
-***Response format:***
-- Output only the translation without any explanations or disclaimers
-
-English question: {question}
-
-{language} translation:"""
+    translation_prompt = build_translation_prompt(question, language)
     model = get_query_model("2.0-flash")
     return await model.query(translation_prompt)
 
 async def retry_translation(query, language):
-    translation_prompt = f"""RETRY TRANSLATION - The previous translation had low semantic similarity when back-translated.
-
-Translate this English question into {language} using a more LITERAL approach:
-- Preserve word order when possible
-- Use direct equivalents rather than paraphrasing  
-- Maintain exact grammatical mood and structure
-- Prioritize semantic accuracy over natural flow
-
-***Response format:***
-- Ouput only the translation without any explanations or disclaimers
-
-English question: {query}
-
-{language} translation (literal approach):"""
+    translation_prompt = build_retry_translation_prompt(query, language)
     model = get_query_model("2.0-flash")
     return await model.query(translation_prompt)
 
 
 async def back_translation(question):
-    back_translation_prompt = f"""Translate this non-English question back to English with maximum fidelity.
-
-Requirements:
-- Preserve EXACT semantic meaning
-- Maintain grammatical structure and mood
-- Use literal translation when semantic meaning is unclear
-
-***Response format:***
-- Output only the English translation
-
-Non-English question: {question}
-
-English translation:"""
+    back_translation_prompt = build_back_translation_prompt(question)
     model = get_query_model("2.0-flash")
     return await model.query(back_translation_prompt)
 

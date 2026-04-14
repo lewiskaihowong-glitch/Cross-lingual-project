@@ -30,16 +30,6 @@ on:
           - 2.5-flash
           - kimi-k2.5
           - mistral-large-3
-      query_source:
-        description: 'Dataset column to use as the model query'
-        required: true
-        type: choice
-        default: auto
-        options:
-          - auto
-          - question
-          - translated_query
-          - original_query
       output_tag:
         description: 'Optional output filename suffix for the run'
         required: false
@@ -85,7 +75,6 @@ jobs:
             "${{ github.event.inputs.data_path }}" \
             "${{ github.event.inputs.model_name }}" \
             "${{ github.event.inputs.language }}" \
-            --query-source "${{ github.event.inputs.query_source }}" \
             --output-tag "${{ github.event.inputs.output_tag }}"
 
       - name: Commit and push results to repository
@@ -95,7 +84,7 @@ jobs:
           git pull origin "${GITHUB_REF_NAME}"
           git add data/evaluation_results/
           if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "Add jailbreak evaluation results for ${{ github.event.inputs.language }} using ${{ github.event.inputs.model_name }} (data_path=${{ github.event.inputs.data_path }}, query_source=${{ github.event.inputs.query_source }})"
+            git commit -m "Add jailbreak evaluation results for ${{ github.event.inputs.language }} using ${{ github.event.inputs.model_name }} (data_path=${{ github.event.inputs.data_path }})"
             git push origin "HEAD:${GITHUB_REF_NAME}"
             echo "Results committed and pushed to repository"
           else

@@ -72,15 +72,9 @@ class QueryModel:
             completion_params = {
                 "model": self.model_id,
                 "messages": messages,
+                "temperature": self.temperature,
             }
             
-            # Note: Azure Kimi may automatically include reasoning in responses
-            # without needing a special parameter. We'll check the response structure.
-            # If needed, uncomment below to try extra_body parameter:
-            # if "kimi" in self.model_id.lower() and self.return_reasoning:
-            #     completion_params["extra_body"] = {"reasoning_effort": "high"}
-
-            # Apply a shared per-model throttle before issuing the request.
             async with _get_model_limiter(self.model_id):
                 response = completion(**completion_params)
             
@@ -94,24 +88,7 @@ class QueryModel:
                 print(f"Message attributes: {dir(response.choices[0].message)}")
                 if hasattr(response.choices[0].message, '__dict__'):
                     print(f"Message dict: {response.choices[0].message.__dict__}")
-            
-            # Extract reasoning if available and requested
-            if self.return_reasoning:
-                reasoning = None
-                content = response.choices[0].message.content
-                
-                # Check various possible locations for reasoning in the response
-                if hasattr(response.choices[0].message, 'reasoning_content'):
-                    reasoning = response.choices[0].message.reasoning_content
-                elif hasattr(response.choices[0], 'reasoning'):
-                    reasoning = response.choices[0].reasoning
-                elif hasattr(response, 'reasoning'):
-                    reasoning = response.reasoning
-                # Check in the raw response object
-                elif hasattr(response, '_hidden_params') and 'reasoning' in response._hidden_params:
-                    reasoning = response._hidden_params['reasoning']
-                
-                return {"content": content, "reasoning": reasoning}
+        
             
             return response.choices[0].message.content
         except Exception as e:
