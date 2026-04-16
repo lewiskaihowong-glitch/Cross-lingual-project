@@ -52,6 +52,14 @@ def prompt_builder(question, language):
     prompt = translation_prompt.format(question=question, language=language)
     return prompt
 
+
+def _resolve_temperature(model_id, requested_temperature):
+    """Return a provider-compatible temperature for each model family."""
+    # GPT-5 deployments currently enforce temperature=1.
+    if "gpt-5" in model_id.lower():
+        return 1
+    return requested_temperature
+
 class QueryModel:
     def __init__(self, model_name, model_id, return_reasoning=False):
         self.model_name = model_name
@@ -72,7 +80,7 @@ class QueryModel:
             completion_params = {
                 "model": self.model_id,
                 "messages": messages,
-                "temperature": self.temperature,
+                "temperature": _resolve_temperature(self.model_id, self.temperature),
             }
             
             async with _get_model_limiter(self.model_id):
